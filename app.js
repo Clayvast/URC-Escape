@@ -160,7 +160,8 @@ function showPuzzle(puzzle){
     check(()=>seq,"Check sequence");
   }else if(type==="memory_sequence"){
     const seq=(cfg.displaySequence||[]).map(String);const display=document.createElement("p");display.className="memory-sequence";display.textContent=seq.join(" · ")||"Sequence not configured";form.append(display);
-    const answer=input("Repeat sequence, separated by commas");check(()=>answer.value.split(/[ ,]+/).filter(Boolean),"Check sequence");
+    const answer=input("Repeat sequence, separated by commas");answer.disabled=true;display.textContent="Memorise the sequence…";setTimeout(()=>{display.textContent="Sequence hidden";answer.disabled=false;answer.focus()},Number(cfg.showForMs||5000));
+    check(()=>answer.value.split(/[ ,]+/).filter(Boolean),"Check sequence");
   }else if(type==="combination_dials"){
     const dials=cfg.dials||[{label:"Dial 1",min:0,max:9},{label:"Dial 2",min:0,max:9},{label:"Dial 3",min:0,max:9}];const values=[];
     dials.forEach((d,i)=>{const l=document.createElement("label");l.textContent=d.label||("Dial "+(i+1));const sel=document.createElement("select");for(let n=Number(d.min??0);n<=Number(d.max??9);n++){const o=document.createElement("option");o.value=n;o.textContent=n;sel.append(o)}values[i]=Number(sel.value);sel.onchange=()=>values[i]=Number(sel.value);l.append(sel);form.append(l)});
@@ -174,7 +175,7 @@ function showPuzzle(puzzle){
     const count=Math.max(4,Math.min(16,Number(cfg.pieces||9)));const tiles=Array.from({length:count},(_,i)=>i+1);
     for(let i=count-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[tiles[i],tiles[j]]=[tiles[j],tiles[i]]}
     const board=document.createElement("div");board.className="jigsaw-grid";let selected=-1;
-    const draw=()=>{board.replaceChildren();tiles.forEach((v,i)=>{const b=document.createElement("button");b.type="button";b.textContent=v;b.className=selected===i?"selected":"";b.onclick=()=>{if(selected<0){selected=i;draw()}else{[tiles[selected],tiles[i]]=[tiles[i],tiles[selected]];selected=-1;draw()}};board.append(b)})};draw();form.append(board);
+    const draw=()=>{board.replaceChildren();tiles.forEach((v,i)=>{const b=document.createElement("button");b.type="button";b.textContent=cfg.imageUrl?"":v;b.className=selected===i?"selected":"";if(cfg.imageUrl){const original=v-1,cols=3,rr=Math.floor(original/cols),cc=original%cols;b.style.backgroundImage="url("+JSON.stringify(cfg.imageUrl)+")";b.style.backgroundSize="300% 300%";b.style.backgroundPosition=(cc*50)+"% "+(rr*50)+"%";}b.onclick=()=>{if(selected<0){selected=i;draw()}else{[tiles[selected],tiles[i]]=[tiles[i],tiles[selected]];selected=-1;draw()}};board.append(b)})};draw();form.append(board);
     check(()=>tiles,"Check arrangement");
   }else if(type==="circuit_connection"){
     const choices=cfg.connections||["A-B","A-C","B-C","B-D","C-D"];const chosenWires=new Set();const list=document.createElement("div");list.className="wire-list";
