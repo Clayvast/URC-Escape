@@ -16,3 +16,10 @@
 .puzzle-answer-form input{margin:0}
 .puzzle-answer-form .primary{padding:10px}
 .puzzle-success{color:var(--accent)!important;font-size:11px;line-height:1.5}
+
+.secondary{width:100%;padding:11px;margin-top:8px;border:1px solid #50657b;border-radius:8px;background:#263747;color:var(--text);font-weight:700;cursor:pointer}
+.secondary:disabled{opacity:.45;cursor:not-allowed}
+.room.locked{fill:#0b1119;fill-opacity:.88;stroke:#d6a94b;stroke-dasharray:7 5}
+.room.locked:hover,.room.locked.selected{fill:#d6a94b;fill-opacity:.25;stroke:#f0c66e}
+.room.unlocked{fill:#a5f36b;fill-opacity:0;stroke:transparent}
+.room.unlocked:hover,.room.unlocked.selected{fill-opacity:.25;stroke:var(--accent)}
