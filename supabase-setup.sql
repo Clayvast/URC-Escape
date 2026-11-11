@@ -174,6 +174,7 @@ revoke all on public.room_unlock_rules from anon, authenticated;
 
 -- Example progression. Adjust costs and prerequisites to suit the final game.
 insert into public.room_unlock_rules(room_name,unlock_cost_shards,required_room,required_item_id) values
+  ('Forum',0,null,null),
   ('Garden',1,'Hall',null),
   ('Kitchen',1,'Hall',null),
   ('Hall',2,'Hallway',null),
