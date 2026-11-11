@@ -1,6 +1,26 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-const ready=window.URC_SUPABASE_URL&&!window.URC_SUPABASE_URL.startsWith("YOUR_")&&window.URC_SUPABASE_ANON_KEY&&!window.URC_SUPABASE_ANON_KEY.startsWith("YOUR_");
-const sb=ready?createClient(window.URC_SUPABASE_URL,window.URC_SUPABASE_ANON_KEY):null;
+let sb = null;
+
+const ready =
+    window.URC_SUPABASE_URL &&
+    !window.URC_SUPABASE_URL.startsWith("YOUR_") &&
+    window.URC_SUPABASE_ANON_KEY &&
+    !window.URC_SUPABASE_ANON_KEY.startsWith("YOUR_");
+
+const supabaseReady = (async () => {
+    if (!ready) return;
+
+    try {
+        const { createClient } =
+            await import("https://esm.sh/@supabase/supabase-js@2");
+
+        sb = createClient(
+            window.URC_SUPABASE_URL,
+            window.URC_SUPABASE_ANON_KEY
+        );
+    } catch (error) {
+        console.error("Supabase failed to load:", error);
+    }
+})();
 const rooms=["Garden","Kitchen","Hall","Backstage","Band Stand","Stage","Sanctuary","Forum","Hallway","WC","Office (west)","Vestry","Lounge","Storage","Youth Room","Office (east)","Side room"];
 const desc={"Garden":"An outdoor garden. Search for hidden clues.","Kitchen":"A kitchen with possible ingredients and clues.","Hall":"A large hall connecting several parts of the building.","Backstage":"A restricted backstage area.","Band Stand":"A small band stand beside the stage.","Stage":"A performance space.","Sanctuary":"A spacious sanctuary.","Forum":"A long room connecting the sanctuary to the hallway.","Hallway":"A central corridor with several doorways.","WC":"A small room off the hallway.","Office (west)":"An office beside the WC.","Vestry":"A room connected to the central hallway.","Lounge":"A lounge and potential meeting point.","Storage":"A small storage room.","Youth Room":"A separate room on the east side.","Office (east)":"A small office beside the Youth Room.","Side room":"A small unlabelled room."};
 const $=s=>document.querySelector(s);let portal="player",user=null,profile=null,known=new Set(),chosen=null;
@@ -12,7 +32,7 @@ async function enter(u){let p=await sb.from("profiles").select("*").eq("id",u.id
 function render(){document.querySelectorAll(".room").forEach(el=>el.classList.toggle("unexplored",!known.has(el.dataset.room)));$("#map-status").textContent=`${known.size} / ${rooms.length} rooms discovered`}
 document.querySelectorAll(".room").forEach(el=>{el.onclick=()=>{let n=el.dataset.room;if(!known.has(n)){toast("You have not discovered this room yet.");return}document.querySelectorAll(".room").forEach(x=>x.classList.remove("selected"));el.classList.add("selected");chosen=n;$("#room-name").textContent=n;$("#room-description").textContent=desc[n];$("#room-meta").textContent="Discovered room";$("#inspect").disabled=false}});
 $("#inspect").onclick=()=>toast(chosen+" interactions will be added in the next stage.");
-$("#login-form").onsubmit=async e=>{e.preventDefault();$("#auth-error").textContent="";if(!sb){$("#auth-error").textContent="Add your Supabase project URL and anon key in supabase-config.js first.";return}let b=$("#login-button");b.disabled=true;b.textContent="Signing in…";try{let {data,error}=await sb.auth.signInWithPassword({email:toEmail($("#username").value),password:$("#password").value});if(error)throw error;await enter(data.user)}catch(err){$("#auth-error").textContent=err.message==="Invalid login credentials"?"Incorrect username or password.":err.message}finally{b.disabled=false;b.textContent="Sign in"}};
+$("#login-form").onsubmit=async e=>{e.preventDefault();$("#auth-error").textContent="";await supabaseReady;if(!sb){$("#auth-error").textContent="Add your Supabase project URL and anon key in supabase-config.js first.";return}let b=$("#login-button");b.disabled=true;b.textContent="Signing in…";try{let {data,error}=await sb.auth.signInWithPassword({email:toEmail($("#username").value),password:$("#password").value});if(error)throw error;await enter(data.user)}catch(err){$("#auth-error").textContent=err.message==="Invalid login credentials"?"Incorrect username or password.":err.message}finally{b.disabled=false;b.textContent="Sign in"}};
 $("#signout").onclick=async()=>{await sb?.auth.signOut();location.reload()};
 $("#create-player").onsubmit=async e=>{e.preventDefault();$("#create-error").textContent="";let b=e.submitter;b.disabled=true;try{let {data,error}=await sb.functions.invoke("admin-create-player",{body:{username:$("#new-username").value,password:$("#new-password").value,starting_room:$("#starting-room").value,ability:$("#ability").value}});if(error)throw error;if(data.error)throw Error(data.error);toast("Created "+data.username);e.target.reset()}catch(err){$("#create-error").textContent=err.message+" (check that the Edge Function is deployed)"}finally{b.disabled=false}};
 if(!ready)$("#auth-error").textContent="Setup required: add Supabase URL and anon key to supabase-config.js.";
