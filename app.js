@@ -11,9 +11,86 @@ const toEmail=u=>u.trim().toLowerCase()+"@players.urcescape.invalid";
 async function enter(u){let p=await sb.from("profiles").select("*").eq("id",u.id).single();if(p.error)throw new Error("No player profile found. Check the SQL setup.");profile=p.data;if(portal==="admin"&&profile.role!=="admin")throw new Error("This account is not an administrator.");user=u;$("#session-label").textContent=profile.username;$("#signout").classList.remove("hidden");$("#auth-view").classList.add("hidden");$("#game-view").classList.remove("hidden");$("#admin-panel").classList.toggle("hidden",profile.role!=="admin");$("#player-name").textContent=profile.username;let pr=await sb.from("player_progress").select("*").eq("player_id",u.id).maybeSingle();let xp=pr.data?.xp||0;$("#player-level").textContent=`Level ${Math.floor(xp/100)+1} · ${xp} XP`;$("#xp-label").textContent=xp+" XP";$("#xp-bar").style.width=(xp%100)+"%";$("#shards").textContent=pr.data?.key_shards||0;let d=await sb.from("player_rooms").select("room_name").eq("player_id",u.id);known=new Set((d.data||[]).map(x=>x.room_name));if(profile.starting_room)known.add(profile.starting_room);await sb.from("player_rooms").upsert({player_id:u.id,room_name:profile.starting_room},{onConflict:"player_id,room_name"});await loadInventory(u.id);render()}
 async function loadInventory(playerId){const list=$("#inventory-list");list.replaceChildren();const {data,error}=await sb.from("player_inventory").select("item_id,item_name,description,icon,quantity").eq("player_id",playerId).order("acquired_at",{ascending:true});if(error){$("#inventory-count").textContent="Unavailable";list.textContent="Inventory setup is required. Ask the game master to apply the latest database setup.";console.error("Inventory load failed:",error);return}const items=data||[];const total=items.reduce((sum,item)=>sum+(item.quantity||1),0);$("#inventory-count").textContent=total+ (total===1?" item":" items");if(!items.length){list.textContent="Your inventory is empty. Keep exploring to find useful objects.";return}for(const item of items){const row=document.createElement("div");row.className="inventory-item";const icon=document.createElement("span");icon.className="inventory-icon";icon.textContent=item.icon||"🎒";const details=document.createElement("div");details.className="inventory-details";const name=document.createElement("b");name.textContent=item.item_name||item.item_id;const description=document.createElement("small");description.textContent=item.description||"No description available.";details.append(name,description);const quantity=document.createElement("span");quantity.className="inventory-quantity";quantity.textContent="×"+(item.quantity||1);row.append(icon,details,quantity);list.append(row)}}
 function render(){document.querySelectorAll(".room").forEach(el=>el.classList.toggle("unexplored",!known.has(el.dataset.room)));$("#map-status").textContent=`${known.size} / ${rooms.length} rooms discovered`}
-document.querySelectorAll(".room").forEach(el=>{el.onclick=()=>{let n=el.dataset.room;if(!known.has(n)){toast("You have not discovered this room yet.");return}document.querySelectorAll(".room").forEach(x=>x.classList.remove("selected"));el.classList.add("selected");chosen=n;$("#room-name").textContent=n;$("#room-description").textContent=desc[n];$("#room-meta").textContent="Discovered room";$("#inspect").disabled=false}});
+document.querySelectorAll(".room").forEach(el=>{el.onclick=()=>{let n=el.dataset.room;if(!known.has(n)){toast("You have not discovered this room yet.");return}document.querySelectorAll(".room").forEach(x=>x.classList.remove("selected"));el.classList.add("selected");chosen=n;$("#room-name").textContent=n;$("#room-description").textContent=desc[n];$("#room-meta").textContent="Discovered room";$("#inspect").disabled=false;loadRoomPuzzles(n)}});
 $("#inspect").onclick=()=>toast(chosen+" interactions will be added in the next stage.");
 $("#login-form").onsubmit=async e=>{e.preventDefault();$("#auth-error").textContent="";if(!sb){$("#auth-error").textContent="Add your Supabase project URL and anon key in supabase-config.js first.";return}let b=$("#login-button");b.disabled=true;b.textContent="Signing in…";try{let {data,error}=await sb.auth.signInWithPassword({email:toEmail($("#username").value),password:$("#password").value});if(error)throw error;await enter(data.user)}catch(err){$("#auth-error").textContent=err.message==="Invalid login credentials"?"Incorrect username or password.":err.message}finally{b.disabled=false;b.textContent="Sign in"}};
 $("#signout").onclick=async()=>{await sb?.auth.signOut();location.reload()};
 $("#create-player").onsubmit=async e=>{e.preventDefault();$("#create-error").textContent="";let b=e.submitter;b.disabled=true;try{let {data,error}=await sb.functions.invoke("admin-create-player",{body:{username:$("#new-username").value,password:$("#new-password").value,starting_room:$("#starting-room").value,ability:$("#ability").value}});if(error)throw error;if(data.error)throw Error(data.error);toast("Created "+data.username);e.target.reset()}catch(err){$("#create-error").textContent=err.message+" (check that the Edge Function is deployed)"}finally{b.disabled=false}};
 if(!ready)$("#auth-error").textContent="Setup required: add Supabase URL and anon key to supabase-config.js.";
+
+
+// Puzzle interface: prompts are public to authenticated players, but answers
+// are checked by a Supabase RPC and are never sent to the browser.
+async function loadRoomPuzzles(roomName){
+  const list=$("#puzzle-list"),play=$("#puzzle-play");
+  list.replaceChildren();play.replaceChildren();
+  $("#puzzle-count").textContent="Loading…";
+  const {data,error}=await sb.rpc("get_room_puzzles",{p_room_name:roomName});
+  if(error){
+    $("#puzzle-count").textContent="Unavailable";
+    list.textContent="Puzzle setup is required. The game master must apply the latest database setup.";
+    console.error("Puzzle load failed:",error);
+    return;
+  }
+  const puzzles=data||[];
+  $("#puzzle-count").textContent=puzzles.length+(puzzles.length===1?" puzzle":" puzzles");
+  if(!puzzles.length){
+    list.textContent="No puzzles have been added to this room yet.";
+    return;
+  }
+  for(const puzzle of puzzles){
+    const button=document.createElement("button");
+    button.type="button";
+    button.className="puzzle-choice"+(puzzle.solved?" solved":"");
+    button.textContent=(puzzle.solved?"✓ ":"🧩 ")+puzzle.title+(puzzle.solved?" · Solved":"");
+    button.onclick=()=>showPuzzle(puzzle);
+    list.append(button);
+  }
+}
+function showPuzzle(puzzle){
+  const play=$("#puzzle-play");
+  play.replaceChildren();
+  const title=document.createElement("h3");title.textContent=puzzle.title;
+  const prompt=document.createElement("p");prompt.className="puzzle-prompt";prompt.textContent=puzzle.prompt;
+  play.append(title,prompt);
+  const reward=document.createElement("p");reward.className="puzzle-reward";
+  reward.textContent="Reward: "+puzzle.reward_xp+" XP"+(puzzle.reward_shards?" · "+puzzle.reward_shards+" key shards":"");
+  play.append(reward);
+  if(puzzle.solved){
+    const done=document.createElement("p");done.className="puzzle-success";done.textContent="You have already solved this puzzle.";
+    play.append(done);return;
+  }
+  const hint=document.createElement("button");hint.type="button";hint.className="puzzle-hint";hint.textContent="Show hint";
+  const hintText=document.createElement("p");hintText.className="puzzle-hint-text hidden";hintText.textContent=puzzle.hint||"No hint is available.";
+  hint.onclick=()=>{hintText.classList.toggle("hidden");hint.textContent=hintText.classList.contains("hidden")?"Show hint":"Hide hint"};
+  play.append(hint,hintText);
+  const form=document.createElement("form");form.className="puzzle-answer-form";
+  const input=document.createElement("input");input.type="text";input.placeholder="Enter your answer";input.autocomplete="off";input.required=true;
+  const submit=document.createElement("button");submit.type="submit";submit.className="primary";submit.textContent="Submit answer";
+  const feedback=document.createElement("p");feedback.className="puzzle-feedback";
+  form.append(input,submit,feedback);
+  form.onsubmit=async event=>{
+    event.preventDefault();submit.disabled=true;submit.textContent="Checking…";feedback.textContent="";
+    try{
+      const {data,error}=await sb.rpc("submit_puzzle_answer",{p_puzzle_id:puzzle.id,p_answer:input.value});
+      if(error)throw error;
+      if(!data?.correct){feedback.textContent=data?.message||"That answer was not correct. Try again.";return}
+      feedback.textContent=data.message||"Puzzle solved!";
+      feedback.className="puzzle-feedback puzzle-success";
+      if(!data.already_solved){
+        const xp=data.xp_awarded||0,shards=data.shards_awarded||0;
+        toast("Puzzle solved! +"+xp+" XP"+(shards?" · +"+shards+" shards":""));
+        const {data:progress}=await sb.from("player_progress").select("*").eq("player_id",user.id).maybeSingle();
+        const total=progress?.xp||0;
+        $("#player-level").textContent="Level "+(Math.floor(total/100)+1)+" · "+total+" XP";
+        $("#xp-label").textContent=total+" XP";$("#xp-bar").style.width=(total%100)+"%";
+        $("#shards").textContent=progress?.key_shards||0;
+      }
+      await loadRoomPuzzles(chosen);
+      const solved=document.createElement("p");solved.className="puzzle-success";solved.textContent="Puzzle completed. Your reward has been added.";
+      play.replaceChildren(title,prompt,solved);
+    }catch(err){feedback.textContent=err.message||"Could not submit your answer."}
+    finally{submit.disabled=false;submit.textContent="Submit answer"}
+  };
+  play.append(form);
+}
