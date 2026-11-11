@@ -171,7 +171,7 @@ function showPuzzle(puzzle){
     if(playerInventory.has(item)){msg.textContent=cfg.hiddenMessage||"The hidden message is ready to read.";form.append(msg);const a=input("Enter the revealed message");check(()=>a.value,"Submit message")}
     else{msg.textContent="This message requires the inventory item: "+item;form.append(msg)}
   }else if(type==="picture_reconstruction"){
-    if(cfg.imageUrl){const img=document.createElement("img");img.src=cfg.imageUrl;img.alt="Puzzle reference";img.className="puzzle-reference-image";form.append(img)}
+    
     const count=Math.max(4,Math.min(16,Number(cfg.pieces||9)));const tiles=Array.from({length:count},(_,i)=>i+1);
     for(let i=count-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[tiles[i],tiles[j]]=[tiles[j],tiles[i]]}
     const board=document.createElement("div");board.className="jigsaw-grid";let selected=-1;
