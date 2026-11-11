@@ -195,14 +195,14 @@ function resetPuzzleEditor(){
 }
 function togglePuzzleFields(){
   const type=$("#puzzle-type").value;
-  $("#puzzle-options-wrap").classList.toggle("hidden",type!=="multiple_choice");
+  $("#puzzle-options-wrap").classList.toggle("hidden",type!=="multiple_choice");$("#puzzle-config-wrap").classList.toggle("hidden",["text","cipher","numerical","multiple_choice"].includes(type));$("#puzzle-answer").required=type!=="pager";$("#puzzle-answer-label").firstChild.textContent=type==="pager"?"Correct answer (unused)":"Correct answer";
   $("#puzzle-tolerance-wrap").classList.toggle("hidden",type!=="numerical");
 }
 function editAdminPuzzle(p){
   editingPuzzleId=p.id;$("#puzzle-editor-title").textContent="Edit puzzle";
   $("#puzzle-room").value=p.room_name;$("#puzzle-title").value=p.title;$("#puzzle-prompt").value=p.prompt;
   $("#puzzle-type").value=p.answer_type;$("#puzzle-options").value=(p.options||[]).join("\n");
-  $("#puzzle-answer").value=p.answer;$("#puzzle-tolerance").value=p.numeric_tolerance||0;
+  $("#puzzle-answer").value=p.answer;$("#puzzle-tolerance").value=p.numeric_tolerance||0;$("#puzzle-config").value=JSON.stringify(p.puzzle_config||{},null,2);
   $("#puzzle-hint-1").value=p.hint_1||"";$("#puzzle-hint-2").value=p.hint_2||"";$("#puzzle-hint-3").value=p.hint_3||"";
   $("#puzzle-xp").value=p.reward_xp;$("#puzzle-shards").value=p.reward_shards;$("#puzzle-active").checked=p.active;
   $("#puzzle-editor-title").textContent="Edit puzzle";$("#puzzle-save").textContent="Save changes";$("#puzzle-cancel").classList.remove("hidden");
@@ -219,7 +219,7 @@ $("#puzzle-editor").onsubmit=async e=>{
     p_numeric_tolerance:type==="numerical"?Number($("#puzzle-tolerance").value||0):0,
     p_hint_1:$("#puzzle-hint-1").value,p_hint_2:$("#puzzle-hint-2").value,p_hint_3:$("#puzzle-hint-3").value,
     p_reward_xp:Number($("#puzzle-xp").value||0),p_reward_shards:Number($("#puzzle-shards").value||0),
-    p_active:$("#puzzle-active").checked};
+    p_active:$("#puzzle-active").checked,p_config:JSON.parse($("#puzzle-config").value||"{}")};
   try{const {error}=await sb.rpc("admin_save_puzzle",payload);if(error)throw error;toast(editingPuzzleId?"Puzzle updated":"Puzzle created");resetPuzzleEditor();await loadAdminPuzzles()}
   catch(err){toast(err.message||"Could not save puzzle")}
   finally{button.disabled=false;button.textContent=editingPuzzleId?"Save changes":"Create puzzle"}
