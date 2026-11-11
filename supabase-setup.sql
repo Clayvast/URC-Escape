@@ -19,3 +19,22 @@ create trigger on_urc_auth_user_created after insert on auth.users for each row 
 -- After creating your first admin Auth user, promote its profile:
 -- update public.profiles set role='admin' where username='YOUR_ADMIN_USERNAME';
 -- Browser policies intentionally do not allow players to award themselves XP or shards.
+
+
+-- Player inventory. Players can read their own items; only trusted server-side
+-- functions should award or remove items (never expose the service-role key).
+create table if not exists public.player_inventory(
+  player_id uuid not null references public.profiles(id) on delete cascade,
+  item_id text not null,
+  item_name text not null,
+  description text not null default '',
+  icon text not null default '🎒',
+  quantity integer not null default 1 check(quantity > 0),
+  acquired_at timestamptz not null default now(),
+  primary key(player_id,item_id)
+);
+alter table public.player_inventory enable row level security;
+grant select on public.player_inventory to authenticated;
+drop policy if exists "own inventory read" on public.player_inventory;
+create policy "own inventory read" on public.player_inventory
+  for select to authenticated using(player_id=auth.uid());
