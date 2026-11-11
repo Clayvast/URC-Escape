@@ -62,11 +62,15 @@ begin
     raise exception 'Unsupported answer type.';
   end if;
   if nullif(trim(p_answer),'') is null then raise exception 'The correct answer is required.'; end if;
-  if p_answer_type='multiple_choice' and (
-    jsonb_typeof(coalesce(p_options,'[]'::jsonb)) <> 'array'
-    or jsonb_array_length(coalesce(p_options,'[]'::jsonb)) < 2
-    or not (coalesce(p_options,'[]'::jsonb) ? p_answer)
-  ) then raise exception 'Multiple choice needs at least two options and the correct answer must match one.'; end if;
+  if p_answer_type='multiple_choice' then
+    if jsonb_typeof(coalesce(p_options,'[]'::jsonb)) <> 'array' then
+      raise exception 'Multiple choice options must be a list.';
+    end if;
+    if jsonb_array_length(coalesce(p_options,'[]'::jsonb)) < 2
+       or not (coalesce(p_options,'[]'::jsonb) ? p_answer) then
+      raise exception 'Multiple choice needs at least two options and the correct answer must match one.';
+    end if;
+  end if;
   if p_answer_type='numerical' then
     perform trim(p_answer)::numeric;
     if coalesce(p_numeric_tolerance,0)<0 then raise exception 'Tolerance cannot be negative.'; end if;
