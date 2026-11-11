@@ -139,7 +139,7 @@ function showPuzzle(puzzle){
   };
   const button=(label,fn)=>{const b=document.createElement("button");b.type="button";b.className="secondary";b.textContent=label;b.onclick=fn;form.append(b);return b};
   const input=(placeholder,type="text")=>{const i=document.createElement("input");i.type=type;i.placeholder=placeholder;i.autocomplete="off";form.append(i);return i};
-  const check=(value,label)=>{const b=document.createElement("button");b.type="button";b.className="primary";b.textContent=label;b.onclick=()=>finish(value());form.append(b)};
+  const check=(value,label)=>{const b=document.createElement("button");b.type="button";b.className="primary";b.textContent=label;b.onclick=()=>finish(value());form.append(b);return b};
   const type=puzzle.answer_type;
   if(type==="pager"){
     const p=document.createElement("p");p.className="muted";p.textContent="A player holding the Pager generates a code. A different player must enter it here.";form.append(p);
@@ -160,8 +160,7 @@ function showPuzzle(puzzle){
     check(()=>seq,"Check sequence");
   }else if(type==="memory_sequence"){
     const seq=(cfg.displaySequence||[]).map(String);const display=document.createElement("p");display.className="memory-sequence";display.textContent=seq.join(" · ")||"Sequence not configured";form.append(display);
-    const answer=input("Repeat sequence, separated by commas");answer.disabled=true;display.textContent="Memorise the sequence…";setTimeout(()=>{display.textContent="Sequence hidden";answer.disabled=false;answer.focus()},Number(cfg.showForMs||5000));
-    check(()=>answer.value.split(/[ ,]+/).filter(Boolean),"Check sequence");
+    const answer=input("Repeat sequence, separated by commas");answer.disabled=true;const checkButton=check(()=>answer.value.split(/[ ,]+/).filter(Boolean),"Check sequence");checkButton.disabled=true;setTimeout(()=>{display.textContent="Sequence hidden";answer.disabled=false;checkButton.disabled=false;answer.focus()},Number(cfg.showForMs||5000));
   }else if(type==="combination_dials"){
     const dials=cfg.dials||[{label:"Dial 1",min:0,max:9},{label:"Dial 2",min:0,max:9},{label:"Dial 3",min:0,max:9}];const values=[];
     dials.forEach((d,i)=>{const l=document.createElement("label");l.textContent=d.label||("Dial "+(i+1));const sel=document.createElement("select");for(let n=Number(d.min??0);n<=Number(d.max??9);n++){const o=document.createElement("option");o.value=n;o.textContent=n;sel.append(o)}values[i]=Number(sel.value);sel.onchange=()=>values[i]=Number(sel.value);l.append(sel);form.append(l)});
