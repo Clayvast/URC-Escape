@@ -126,7 +126,8 @@ begin
 
   if v_rule.required_room is not null
      and not exists(select 1 from public.player_rooms where player_id=auth.uid() and room_name=v_rule.required_room)
-     and not exists(select 1 from public.profiles where id=auth.uid() and starting_room=v_rule.required_room) then
+     and not exists(select 1 from public.profiles where id=auth.uid() and starting_room=v_rule.required_room)
+     and v_rule.required_room<>'Forum' then
     return jsonb_build_object('success',false,'message','You must discover '||v_rule.required_room||' first.');
   end if;
 
