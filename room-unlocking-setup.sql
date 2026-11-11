@@ -85,12 +85,12 @@ as $$
     rules.required_room,
     rules.required_item_id,
     exists(select 1 from public.player_rooms pr where pr.player_id=auth.uid() and pr.room_name=rules.room_name),
-    rules.required_room is null or exists(select 1 from public.player_rooms pr where pr.player_id=auth.uid() and pr.room_name=rules.required_room) or exists(select 1 from public.profiles p where p.id=auth.uid() and p.starting_room=rules.required_room),
+    rules.required_room is null or exists(select 1 from public.player_rooms pr where pr.player_id=auth.uid() and pr.room_name=rules.required_room) or exists(select 1 from public.profiles p where p.id=auth.uid() and (p.(starting_room=rules.required_room or rules.required_room='Forum') or rules.required_room='Forum')),
     rules.required_item_id is null or exists(select 1 from public.player_inventory pi where pi.player_id=auth.uid() and pi.item_id=rules.required_item_id and pi.quantity>0),
     coalesce(progress.key_shards,0),
     rules.active
       and not exists(select 1 from public.player_rooms pr where pr.player_id=auth.uid() and pr.room_name=rules.room_name)
-      and (rules.required_room is null or exists(select 1 from public.player_rooms pr where pr.player_id=auth.uid() and pr.room_name=rules.required_room) or exists(select 1 from public.profiles p where p.id=auth.uid() and p.starting_room=rules.required_room))
+      and (rules.required_room is null or exists(select 1 from public.player_rooms pr where pr.player_id=auth.uid() and pr.room_name=rules.required_room) or exists(select 1 from public.profiles p where p.id=auth.uid() and (p.(starting_room=rules.required_room or rules.required_room='Forum') or rules.required_room='Forum')))
       and (rules.required_item_id is null or exists(select 1 from public.player_inventory pi where pi.player_id=auth.uid() and pi.item_id=rules.required_item_id and pi.quantity>0))
       and coalesce(progress.key_shards,0)>=rules.unlock_cost_shards
   from public.room_unlock_rules rules
