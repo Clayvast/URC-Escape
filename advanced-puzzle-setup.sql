@@ -127,7 +127,7 @@ as $$
       when p.answer_type='hidden_message' and not exists(
         select 1 from public.player_inventory i
         where i.player_id=auth.uid() and i.item_id=coalesce(p.puzzle_config->>'requiredItemId','uv_torch') and i.quantity>0
-      ) then p.puzzle_config - 'hiddenMessage'
+       ) then p.puzzle_config - 'hiddenMessage' - 'solution' - 'correct' - 'answer' - 'sequence' - 'code'
       else p.puzzle_config - 'solution' - 'correct' - 'answer' - 'sequence' - 'code'
     end
   from public.puzzles p
