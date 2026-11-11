@@ -4,7 +4,7 @@ const sb=ready?createClient(window.URC_SUPABASE_URL,window.URC_SUPABASE_ANON_KEY
 const rooms=["Garden","Kitchen","Hall","Backstage","Band Stand","Stage","Sanctuary","Forum","Hallway","WC","Office (west)","Vestry","Lounge","Storage","Youth Room","Office (east)","Side room"];
 const desc={"Garden":"An outdoor garden. Search for hidden clues.","Kitchen":"A kitchen with possible ingredients and clues.","Hall":"A large hall connecting several parts of the building.","Backstage":"A restricted backstage area.","Band Stand":"A small band stand beside the stage.","Stage":"A performance space.","Sanctuary":"A spacious sanctuary.","Forum":"A long room connecting the sanctuary to the hallway.","Hallway":"A central corridor with several doorways.","WC":"A small room off the hallway.","Office (west)":"An office beside the WC.","Vestry":"A room connected to the central hallway.","Lounge":"A lounge and potential meeting point.","Storage":"A small storage room.","Youth Room":"A separate room on the east side.","Office (east)":"A small office beside the Youth Room.","Side room":"A small unlabelled room."};
 const $=s=>document.querySelector(s);let portal="player",user=null,profile=null,known=new Set(),chosen=null,roomRules=new Map(),currentShards=0;
-rooms.forEach(r=>{let o=document.createElement("option");o.value=r;o.textContent=r;$("#starting-room").append(o)});
+rooms.forEach(r=>{let o=document.createElement("option");o.value=r;o.textContent=r;$("#starting-room").append(o);let p=document.createElement("option");p.value=r;p.textContent=r;$("#puzzle-room").append(p)});
 function toast(s){let t=$("#toast");t.textContent=s;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),2500)}
 document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{portal=b.dataset.tab;document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active",x===b));$("#portal-label").textContent=portal==="admin"?"ADMINISTRATOR SIGN IN":"PLAYER SIGN IN";$("#portal-title").textContent=portal==="admin"?"Game master access":"Welcome back";$("#auth-error").textContent=""});
 const toEmail=u=>u.trim().toLowerCase()+"@players.urcescape.invalid";
@@ -117,10 +117,6 @@ function showPuzzle(puzzle){
     const done=document.createElement("p");done.className="puzzle-success";done.textContent="You have already solved this puzzle.";
     play.append(done);return;
   }
-  const hint=document.createElement("button");hint.type="button";hint.className="puzzle-hint";hint.textContent="Show hint";
-  const hintText=document.createElement("p");hintText.className="puzzle-hint-text hidden";hintText.textContent=puzzle.hint||"No hint is available.";
-  hint.onclick=()=>{hintText.classList.toggle("hidden");hint.textContent=hintText.classList.contains("hidden")?"Show hint":"Hide hint"};
-  play.append(hint,hintText);
   const hints=[puzzle.hint_1||puzzle.hint||"",puzzle.hint_2||"",puzzle.hint_3||""].filter(Boolean);
   let hintIndex=0;
   const hint=document.createElement("button");hint.type="button";hint.className="puzzle-hint";hint.textContent=hints.length?"Show hint 1":"No hints available";
