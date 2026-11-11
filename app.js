@@ -8,7 +8,7 @@ rooms.forEach(r=>{let o=document.createElement("option");o.value=r;o.textContent
 function toast(s){let t=$("#toast");t.textContent=s;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),2500)}
 document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{portal=b.dataset.tab;document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active",x===b));$("#portal-label").textContent=portal==="admin"?"ADMINISTRATOR SIGN IN":"PLAYER SIGN IN";$("#portal-title").textContent=portal==="admin"?"Game master access":"Welcome back";$("#auth-error").textContent=""});
 const toEmail=u=>u.trim().toLowerCase()+"@players.urcescape.invalid";
-async function enter(u){let p=await sb.from("profiles").select("*").eq("id",u.id).single();if(p.error)throw new Error("No player profile found. Check the SQL setup.");profile=p.data;if(portal==="admin"&&profile.role!=="admin")throw new Error("This account is not an administrator.");user=u;$("#session-label").textContent=profile.username;$("#signout").classList.remove("hidden");$("#auth-view").classList.add("hidden");$("#game-view").classList.remove("hidden");$("#admin-panel").classList.toggle("hidden",profile.role!=="admin");$("#player-name").textContent=profile.username;let pr=await sb.from("player_progress").select("*").eq("player_id",u.id).maybeSingle();let xp=pr.data?.xp||0;$("#player-level").textContent=`Level ${Math.floor(xp/100)+1} · ${xp} XP`;$("#xp-label").textContent=xp+" XP";$("#xp-bar").style.width=(xp%100)+"%";currentShards=pr.data?.key_shards||0;$("#shards").textContent=currentShards;let d=await sb.from("player_rooms").select("room_name").eq("player_id",u.id);known=new Set((d.data||[]).map(x=>x.room_name));await loadRoomUnlocks();await loadInventory(u.id);render()}
+async function enter(u){let p=await sb.from("profiles").select("*").eq("id",u.id).single();if(p.error)throw new Error("No player profile found. Check the SQL setup.");profile=p.data;if(portal==="admin"&&profile.role!=="admin")throw new Error("This account is not an administrator.");user=u;$("#session-label").textContent=profile.username;$("#signout").classList.remove("hidden");$("#auth-view").classList.add("hidden");$("#game-view").classList.remove("hidden");$("#admin-panel").classList.toggle("hidden",profile.role!=="admin");if(profile.role==="admin")await loadAdminPuzzles();$("#player-name").textContent=profile.username;let pr=await sb.from("player_progress").select("*").eq("player_id",u.id).maybeSingle();let xp=pr.data?.xp||0;$("#player-level").textContent=`Level ${Math.floor(xp/100)+1} · ${xp} XP`;$("#xp-label").textContent=xp+" XP";$("#xp-bar").style.width=(xp%100)+"%";currentShards=pr.data?.key_shards||0;$("#shards").textContent=currentShards;let d=await sb.from("player_rooms").select("room_name").eq("player_id",u.id);known=new Set((d.data||[]).map(x=>x.room_name));await loadRoomUnlocks();await loadInventory(u.id);render()}
 async function loadInventory(playerId){const list=$("#inventory-list");list.replaceChildren();const {data,error}=await sb.from("player_inventory").select("item_id,item_name,description,icon,quantity").eq("player_id",playerId).order("acquired_at",{ascending:true});if(error){$("#inventory-count").textContent="Unavailable";list.textContent="Inventory setup is required. Ask the game master to apply the latest database setup.";console.error("Inventory load failed:",error);return}const items=data||[];const total=items.reduce((sum,item)=>sum+(item.quantity||1),0);$("#inventory-count").textContent=total+ (total===1?" item":" items");if(!items.length){list.textContent="Your inventory is empty. Keep exploring to find useful objects.";return}for(const item of items){const row=document.createElement("div");row.className="inventory-item";const icon=document.createElement("span");icon.className="inventory-icon";icon.textContent=item.icon||"🎒";const details=document.createElement("div");details.className="inventory-details";const name=document.createElement("b");name.textContent=item.item_name||item.item_id;const description=document.createElement("small");description.textContent=item.description||"No description available.";details.append(name,description);const quantity=document.createElement("span");quantity.className="inventory-quantity";quantity.textContent="×"+(item.quantity||1);row.append(icon,details,quantity);list.append(row)}}
 async function loadRoomUnlocks(){
   const {data,error}=await sb.rpc("get_room_unlock_options");
@@ -121,8 +121,24 @@ function showPuzzle(puzzle){
   const hintText=document.createElement("p");hintText.className="puzzle-hint-text hidden";hintText.textContent=puzzle.hint||"No hint is available.";
   hint.onclick=()=>{hintText.classList.toggle("hidden");hint.textContent=hintText.classList.contains("hidden")?"Show hint":"Hide hint"};
   play.append(hint,hintText);
+  const hints=[puzzle.hint_1||puzzle.hint||"",puzzle.hint_2||"",puzzle.hint_3||""].filter(Boolean);
+  let hintIndex=0;
+  const hint=document.createElement("button");hint.type="button";hint.className="puzzle-hint";hint.textContent=hints.length?"Show hint 1":"No hints available";
+  const hintText=document.createElement("p");hintText.className="puzzle-hint-text hidden";
+  hint.onclick=()=>{if(hintIndex<hints.length){hintText.textContent=hints[hintIndex++];hintText.classList.remove("hidden");hint.textContent=hintIndex<hints.length?"Show hint "+(hintIndex+1):"All hints revealed"}};
+  play.append(hint,hintText);
   const form=document.createElement("form");form.className="puzzle-answer-form";
-  const input=document.createElement("input");input.type="text";input.placeholder="Enter your answer";input.autocomplete="off";input.required=true;
+  let input;
+  if(puzzle.answer_type==="multiple_choice"){
+    input=document.createElement("select");input.required=true;
+    const placeholder=document.createElement("option");placeholder.value="";placeholder.textContent="Choose an answer";placeholder.disabled=true;placeholder.selected=true;input.append(placeholder);
+    (puzzle.options||[]).forEach(option=>{const o=document.createElement("option");o.value=option;o.textContent=option;input.append(o)});
+  }else{
+    input=document.createElement("input");input.type=puzzle.answer_type==="numerical"?"number":"text";
+    if(puzzle.answer_type==="numerical")input.step="any";
+    input.placeholder=puzzle.answer_type==="cipher"?"Enter the decoded message":"Enter your answer";
+    input.autocomplete="off";input.required=true;
+  }
   const submit=document.createElement("button");submit.type="submit";submit.className="primary";submit.textContent="Submit answer";
   const feedback=document.createElement("p");feedback.className="puzzle-feedback";
   form.append(input,submit,feedback);
@@ -151,3 +167,64 @@ function showPuzzle(puzzle){
   };
   play.append(form);
 }
+
+let editingPuzzleId=null,adminPuzzleCache=[];
+async function loadAdminPuzzles(){
+  const list=$("#admin-puzzle-list");if(!list)return;
+  list.textContent="Loading puzzles…";
+  const {data,error}=await sb.rpc("admin_list_puzzles");
+  if(error){list.textContent="Could not load puzzles: "+error.message;return}
+  adminPuzzleCache=data||[];list.replaceChildren();
+  if(!adminPuzzleCache.length){list.textContent="No puzzles created yet.";return}
+  for(const puzzle of adminPuzzleCache){
+    const row=document.createElement("div");row.className="admin-puzzle-row";
+    const details=document.createElement("div");details.className="admin-puzzle-details";
+    const title=document.createElement("b");title.textContent=puzzle.title;
+    const meta=document.createElement("small");meta.textContent=puzzle.room_name+" · "+puzzle.answer_type.replace("_"," ")+" · "+puzzle.reward_xp+" XP"+(puzzle.reward_shards?" · "+puzzle.reward_shards+" shards":"")+(puzzle.active?" · Active":" · Hidden");
+    details.append(title,meta);
+    const actions=document.createElement("div");actions.className="admin-puzzle-actions";
+    const edit=document.createElement("button");edit.type="button";edit.className="secondary";edit.textContent="Edit";edit.onclick=()=>editAdminPuzzle(puzzle);
+    const del=document.createElement("button");del.type="button";del.className="danger";del.textContent="Delete";del.onclick=async()=>{
+      if(!confirm('Delete "'+puzzle.title+'"? This also removes its solve records.'))return;
+      const {error}=await sb.rpc("admin_delete_puzzle",{p_id:puzzle.id});
+      if(error){toast(error.message);return}toast("Puzzle deleted");if(editingPuzzleId===puzzle.id)resetPuzzleEditor();await loadAdminPuzzles();
+    };
+    actions.append(edit,del);row.append(details,actions);list.append(row);
+  }
+}
+function resetPuzzleEditor(){
+  editingPuzzleId=null;$("#puzzle-editor").reset();$("#puzzle-editor-title").textContent="Create puzzle";
+  $("#puzzle-save").textContent="Create puzzle";$("#puzzle-cancel").classList.add("hidden");
+  $("#puzzle-active").checked=true;togglePuzzleFields();
+}
+function togglePuzzleFields(){
+  const type=$("#puzzle-type").value;
+  $("#puzzle-options-wrap").classList.toggle("hidden",type!=="multiple_choice");
+  $("#puzzle-tolerance-wrap").classList.toggle("hidden",type!=="numerical");
+}
+function editAdminPuzzle(p){
+  editingPuzzleId=p.id;$("#puzzle-editor-title").textContent="Edit puzzle";
+  $("#puzzle-room").value=p.room_name;$("#puzzle-title").value=p.title;$("#puzzle-prompt").value=p.prompt;
+  $("#puzzle-type").value=p.answer_type;$("#puzzle-options").value=(p.options||[]).join("\n");
+  $("#puzzle-answer").value=p.answer;$("#puzzle-tolerance").value=p.numeric_tolerance||0;
+  $("#puzzle-hint-1").value=p.hint_1||"";$("#puzzle-hint-2").value=p.hint_2||"";$("#puzzle-hint-3").value=p.hint_3||"";
+  $("#puzzle-xp").value=p.reward_xp;$("#puzzle-shards").value=p.reward_shards;$("#puzzle-active").checked=p.active;
+  $("#puzzle-editor-title").textContent="Edit puzzle";$("#puzzle-save").textContent="Save changes";$("#puzzle-cancel").classList.remove("hidden");
+  togglePuzzleFields();$("#puzzle-editor").scrollIntoView({behavior:"smooth",block:"start"});
+}
+$("#puzzle-type").addEventListener("change",togglePuzzleFields);
+$("#puzzle-cancel").onclick=resetPuzzleEditor;
+$("#puzzle-editor").onsubmit=async e=>{
+  e.preventDefault();const button=$("#puzzle-save");button.disabled=true;button.textContent="Saving…";
+  const type=$("#puzzle-type").value;
+  const options=type==="multiple_choice"?$("#puzzle-options").value.split("\n").map(x=>x.trim()).filter(Boolean):[];
+  const payload={p_id:editingPuzzleId,p_room_name:$("#puzzle-room").value,p_title:$("#puzzle-title").value,
+    p_prompt:$("#puzzle-prompt").value,p_answer_type:type,p_options:options,p_answer:$("#puzzle-answer").value,
+    p_numeric_tolerance:type==="numerical"?Number($("#puzzle-tolerance").value||0):0,
+    p_hint_1:$("#puzzle-hint-1").value,p_hint_2:$("#puzzle-hint-2").value,p_hint_3:$("#puzzle-hint-3").value,
+    p_reward_xp:Number($("#puzzle-xp").value||0),p_reward_shards:Number($("#puzzle-shards").value||0),
+    p_active:$("#puzzle-active").checked};
+  try{const {error}=await sb.rpc("admin_save_puzzle",payload);if(error)throw error;toast(editingPuzzleId?"Puzzle updated":"Puzzle created");resetPuzzleEditor();await loadAdminPuzzles()}
+  catch(err){toast(err.message||"Could not save puzzle")}
+  finally{button.disabled=false;button.textContent=editingPuzzleId?"Save changes":"Create puzzle"}
+};
