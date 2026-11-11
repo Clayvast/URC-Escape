@@ -15,9 +15,12 @@ Open this folder in VS Code. Because the JavaScript uses ES modules, serve it ov
 1. Create a Supabase project.
 2. In Project Settings -> API, copy the Project URL and anon/public key into `supabase-config.js`.
 3. Never put the service_role key in the browser.
-4. Run `supabase-setup.sql` in the Supabase SQL Editor.
+4. Run `supabase-setup.sql` in the Supabase SQL Editor. If the base setup has already been run, do not rerun it; apply only new feature migrations.
 5. Create your first admin Auth user in Authentication -> Users. Use an email like `adminname@players.urcescape.invalid`, confirm it, and set a password.
 6. Run `update public.profiles set role='admin' where username='adminname';` replacing the username.
+
+## Puzzle system
+After applying the base setup, run `puzzle-setup.sql` once in the Supabase SQL Editor. Puzzle answers are not readable by players: the browser receives prompts and hints, while a database function validates submitted answers and awards XP/key shards. Add puzzle records to `public.puzzles` through the Supabase Table Editor for now; the in-game admin editor is a later feature. The `room_name` must exactly match one of the floor-plan room names, and the player must have discovered that room before its puzzles appear.
 
 ## Admin player creation
 Deploy `supabase/functions/admin-create-player/index.ts` as an Edge Function called `admin-create-player`. Supabase CLI steps:
