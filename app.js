@@ -9,7 +9,48 @@ function toast(s){let t=$("#toast");t.textContent=s;t.classList.add("show");setT
 document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{portal=b.dataset.tab;document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active",x===b));$("#portal-label").textContent=portal==="admin"?"ADMINISTRATOR SIGN IN":"PLAYER SIGN IN";$("#portal-title").textContent=portal==="admin"?"Game master access":"Welcome back";$("#auth-error").textContent=""});
 const toEmail=u=>u.trim().toLowerCase()+"@players.urcescape.invalid";
 async function enter(u){let p=await sb.from("profiles").select("*").eq("id",u.id).single();if(p.error)throw new Error("No player profile found. Check the SQL setup.");profile=p.data;if(portal==="admin"&&profile.role!=="admin")throw new Error("This account is not an administrator.");user=u;$("#session-label").textContent=profile.username;$("#signout").classList.remove("hidden");$("#auth-view").classList.add("hidden");$("#game-view").classList.remove("hidden");$("#admin-panel").classList.toggle("hidden",profile.role!=="admin");if(profile.role==="admin")await loadAdminPuzzles();$("#player-name").textContent=profile.username;let pr=await sb.from("player_progress").select("*").eq("player_id",u.id).maybeSingle();let xp=pr.data?.xp||0;$("#player-level").textContent=`Level ${Math.floor(xp/100)+1} · ${xp} XP`;$("#xp-label").textContent=xp+" XP";$("#xp-bar").style.width=(xp%100)+"%";currentShards=pr.data?.key_shards||0;$("#shards").textContent=currentShards;let d=await sb.from("player_rooms").select("room_name").eq("player_id",u.id);known=new Set((d.data||[]).map(x=>x.room_name));await loadRoomUnlocks();await loadInventory(u.id);render()}
-async function loadInventory(playerId){const list=$("#inventory-list");list.replaceChildren();const {data,error}=await sb.from("player_inventory").select("item_id,item_name,description,icon,quantity").eq("player_id",playerId).order("acquired_at",{ascending:true});if(error){$("#inventory-count").textContent="Unavailable";list.textContent="Inventory setup is required. Ask the game master to apply the latest database setup.";console.error("Inventory load failed:",error);return}const items=data||[];playerInventory=new Set(items.filter(x=>(x.quantity||1)>0).map(x=>x.item_id));const total=items.reduce((sum,item)=>sum+(item.quantity||1),0);$("#inventory-count").textContent=total+ (total===1?" item":" items");if(!items.length){list.textContent="Your inventory is empty. Keep exploring to find useful objects.";return}for(const item of items){const row=document.createElement("div");row.className="inventory-item";const icon=document.createElement("span");icon.className="inventory-icon";icon.textContent=item.icon||"🎒";const details=document.createElement("div");details.className="inventory-details";const name=document.createElement("b");name.textContent=item.item_name||item.item_id;const description=document.createElement("small");description.textContent=item.description||"No description available.";details.append(name,description);const quantity=document.createElement("span");quantity.className="inventory-quantity";quantity.textContent="×"+(item.quantity||1);row.append(icon,details,quantity);list.append(row)}}
+async function loadInventory(playerId){
+ const list=$("#inventory-list");list.replaceChildren();
+ const {data,error}=await sb.from("player_inventory").select("item_id,item_name,description,icon,quantity").eq("player_id",playerId).order("acquired_at",{ascending:true});
+ if(error){$("#inventory-count").textContent="Unavailable";list.textContent="Inventory setup is required.";console.error(error);return}
+ const items=data||[];playerInventory=new Set(items.filter(x=>(x.quantity||1)>0).map(x=>x.item_id));
+ const total=items.reduce((s,x)=>s+(x.quantity||1),0);$("#inventory-count").textContent=total+(total===1?" item":" items");
+ if(!items.length){list.textContent="Your inventory is empty. Keep exploring to find useful objects.";return}
+ for(const item of items){
+  const row=document.createElement("div");row.className="inventory-item";
+  const icon=document.createElement("span");icon.className="inventory-icon";icon.textContent=item.icon||"🎒";
+  const details=document.createElement("div");details.className="inventory-details";
+  const name=document.createElement("b");name.textContent=item.item_name||item.item_id;
+  const description=document.createElement("small");description.textContent=item.description||"No description available.";details.append(name,description);
+  const qty=document.createElement("span");qty.className="inventory-quantity";qty.textContent="×"+(item.quantity||1);row.append(icon,details,qty);
+  if(item.item_id==="pager"&&(item.quantity||1)>0){row.classList.add("inventory-item-clickable");row.tabIndex=0;row.setAttribute("role","button");row.setAttribute("aria-label","Open Pager");row.onclick=()=>openPagerTools(row);row.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();openPagerTools(row)}}}
+  list.append(row);
+ }
+}
+function refreshPlayerProgress(){return sb.from("player_progress").select("*").eq("player_id",user.id).maybeSingle().then(({data})=>{const xp=data?.xp||0;currentShards=data?.key_shards||0;$("#player-level").textContent="Level "+(Math.floor(xp/100)+1)+" · "+xp+" XP";$("#xp-label").textContent=xp+" XP";$("#xp-bar").style.width=(xp%100)+"%";$("#shards").textContent=currentShards})}
+function openPagerTools(row){
+ if(row.nextElementSibling?.classList.contains("pager-tools")){row.nextElementSibling.remove();return}
+ document.querySelectorAll(".pager-tools").forEach(x=>x.remove());
+ const panel=document.createElement("div");panel.className="pager-tools";
+ const heading=document.createElement("b");heading.textContent="📟 Pager";
+ const info=document.createElement("p");info.className="muted";info.textContent="Generate a temporary code for another player, or enter a code they have given you.";
+ const generate=document.createElement("button");generate.type="button";generate.className="secondary";generate.textContent="Generate code";
+ const code=document.createElement("input");code.type="text";code.inputMode="numeric";code.autocomplete="one-time-code";code.maxLength=6;code.placeholder="Enter 6-digit code";
+ const redeem=document.createElement("button");redeem.type="button";redeem.className="primary";redeem.textContent="Use code";
+ const feedback=document.createElement("p");feedback.className="pager-feedback";
+ generate.onclick=async()=>{generate.disabled=true;generate.textContent="Generating…";feedback.textContent="";
+  try{const {data,error}=await sb.rpc("create_pager_code");if(error)throw error;code.value=data.code;feedback.textContent="Your code is "+data.code+". Give it to another player — it expires in 2 minutes.";feedback.classList.add("success")}
+  catch(err){feedback.textContent=err.message||"Could not generate a code.";feedback.classList.remove("success")}
+  finally{generate.disabled=false;generate.textContent="Generate new code"}};
+ redeem.onclick=async()=>{const value=code.value.trim();if(!/^\d{6}$/.test(value)){feedback.textContent="Enter the full 6-digit code.";feedback.classList.remove("success");return}
+  redeem.disabled=true;redeem.textContent="Checking…";feedback.textContent="";
+  try{const {data,error}=await sb.rpc("redeem_pager_code",{p_code:value});if(error)throw error;if(!data?.correct)throw Error(data?.message||"That code could not be used.");
+   feedback.textContent=data.already_solved?"This Pager challenge has already been completed.":"Code accepted! "+(data.xp_awarded||0)+" XP"+(data.shards_awarded?" and "+data.shards_awarded+" key shards":"")+" awarded.";feedback.classList.add("success");code.value="";
+   await refreshPlayerProgress();if(chosen&&known.has(chosen))await loadRoomPuzzles(chosen);toast(data.already_solved?"Challenge already completed":"Pager code accepted!");
+  }catch(err){feedback.textContent=err.message||"Could not use that code.";feedback.classList.remove("success")}
+  finally{redeem.disabled=false;redeem.textContent="Use code"}};
+ panel.append(heading,info,generate,code,redeem,feedback);row.after(panel);
+}
 async function loadRoomUnlocks(){
   const {data,error}=await sb.rpc("get_room_unlock_options");
   if(error){console.error("Room unlock options failed:",error);roomRules=new Map();return}
@@ -142,16 +183,9 @@ function showPuzzle(puzzle){
   const check=(value,label)=>{const b=document.createElement("button");b.type="button";b.className="primary";b.textContent=label;b.onclick=()=>finish(value());form.append(b);return b};
   const type=puzzle.answer_type;
   if(type==="pager"){
-    const p=document.createElement("p");p.className="muted";p.textContent="A player holding the Pager generates a code. A different player must enter it here.";form.append(p);
-    if(playerInventory.has("pager"))button("Generate pager code",async()=>{
-      const {data,error}=await sb.rpc("create_pager_code",{p_puzzle_id:puzzle.id});
-      if(error){feedback.textContent=error.message;return}
-      const code=document.createElement("strong");code.className="pager-code";code.textContent=data.code;
-      const msg=document.createElement("p");msg.className="puzzle-success";msg.textContent="Give this code to another player. It expires in 2 minutes.";
-      form.insertBefore(msg,form.firstChild);form.insertBefore(code,msg);
-    });
-    else{const msg=document.createElement("p");msg.textContent="You need the Pager item to generate a code. Ask a teammate who has one.";msg.className="muted";form.append(msg)}
-    const code=input("Enter the 6-digit code");code.inputMode="numeric";code.maxLength=6;check(()=>code.value,"Unlock with code");
+    const msg=document.createElement("p");msg.className="muted";msg.textContent="Use the Pager in your inventory to generate or enter a code. You no longer need to keep this puzzle open.";form.append(msg);
+    const open=button("Open Pager in inventory",()=>{const pager=[...document.querySelectorAll("#inventory-list .inventory-item")].find(x=>x.getAttribute("aria-label")==="Open Pager");if(pager){pager.scrollIntoView({behavior:"smooth",block:"center"});openPagerTools(pager)}else feedback.textContent="You need the Pager item in your inventory."});
+    if(!playerInventory.has("pager")){open.disabled=true;const missing=document.createElement("p");missing.className="muted";missing.textContent="You need the Pager inventory item.";form.append(missing)}
   }else if(type==="grid_sequence"){
     const seq=[];const grid=document.createElement("div");grid.className="button-grid-3";
     for(let n=0;n<9;n++){const b=document.createElement("button");b.type="button";b.textContent=String(n+1);b.onclick=()=>{seq.push(n+1);b.classList.add("pressed");status.textContent="Entered: "+seq.join(" → ")};grid.append(b)}
