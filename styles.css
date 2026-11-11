@@ -23,3 +23,18 @@
 .room.locked:hover,.room.locked.selected{fill:#d6a94b;fill-opacity:.25;stroke:#f0c66e}
 .room.unlocked{fill:#a5f36b;fill-opacity:0;stroke:transparent}
 .room.unlocked:hover,.room.unlocked.selected{fill-opacity:.25;stroke:var(--accent)}
+
+textarea{display:block;width:100%;padding:11px;margin-top:6px;border:1px solid #34465a;border-radius:8px;background:#0d151f;color:white;font:12px 'DM Sans';resize:vertical}
+.admin-puzzle-manager{border-top:1px solid var(--line);margin-top:20px;padding-top:18px}
+.admin-puzzle-manager h2{margin-top:7px}
+.admin-puzzle-manager label{font-size:11px}
+.admin-reward-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.check-label{display:flex;align-items:center;gap:9px}.check-label input{width:auto;margin:0}
+.admin-puzzle-list{display:grid;gap:8px;margin-top:12px}
+.admin-puzzle-row{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px;background:#0d151f;border:1px solid var(--line);border-radius:8px}
+.admin-puzzle-details{display:grid;gap:4px;min-width:0}.admin-puzzle-details b{font-size:11px}.admin-puzzle-details small{font-size:9px;color:var(--muted)}
+.admin-puzzle-actions{display:flex;gap:5px}.admin-puzzle-actions button{width:auto;margin:0;padding:7px 9px;font-size:10px}
+.danger{border:1px solid #9b4e4e;background:#402326;color:#ffd9d9;border-radius:7px;cursor:pointer}
+.admin-existing-title{margin-top:22px!important}
+.puzzle-answer-form select{width:100%;padding:11px;border:1px solid #34465a;border-radius:8px;background:#0d151f;color:white}
+@media(max-width:600px){.admin-puzzle-row{align-items:flex-start;flex-direction:column}.admin-puzzle-actions{width:100%}.admin-puzzle-actions button{flex:1}}
