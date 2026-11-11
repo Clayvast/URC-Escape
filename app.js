@@ -172,7 +172,7 @@ function showPuzzle(puzzle){
     else{msg.textContent="This message requires the inventory item: "+item;form.append(msg)}
   }else if(type==="picture_reconstruction"){
     
-    const count=Math.max(4,Math.min(16,Number(cfg.pieces||9)));const tiles=Array.from({length:count},(_,i)=>i+1);
+    const count=9;const tiles=Array.from({length:count},(_,i)=>i+1);
     for(let i=count-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[tiles[i],tiles[j]]=[tiles[j],tiles[i]]}
     const board=document.createElement("div");board.className="jigsaw-grid";let selected=-1;
     const draw=()=>{board.replaceChildren();tiles.forEach((v,i)=>{const b=document.createElement("button");b.type="button";b.textContent=cfg.imageUrl?"":v;b.className=selected===i?"selected":"";if(cfg.imageUrl){const original=v-1,cols=3,rr=Math.floor(original/cols),cc=original%cols;b.style.backgroundImage="url("+JSON.stringify(cfg.imageUrl)+")";b.style.backgroundSize="300% 300%";b.style.backgroundPosition=(cc*50)+"% "+(rr*50)+"%";}b.onclick=()=>{if(selected<0){selected=i;draw()}else{[tiles[selected],tiles[i]]=[tiles[i],tiles[selected]];selected=-1;draw()}};board.append(b)})};draw();form.append(board);
