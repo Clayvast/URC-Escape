@@ -138,10 +138,10 @@ function showPuzzle(puzzle){
         const xp=data.xp_awarded||0,shards=data.shards_awarded||0;
         toast("Puzzle solved! +"+xp+" XP"+(shards?" · +"+shards+" shards":""));
         const {data:progress}=await sb.from("player_progress").select("*").eq("player_id",user.id).maybeSingle();
-        const total=progress?.xp||0;
+        const total=progress?.xp||0;currentShards=progress?.key_shards||0;
         $("#player-level").textContent="Level "+(Math.floor(total/100)+1)+" · "+total+" XP";
         $("#xp-label").textContent=total+" XP";$("#xp-bar").style.width=(total%100)+"%";
-        $("#shards").textContent=progress?.key_shards||0;
+        $("#shards").textContent=currentShards;await loadRoomUnlocks();
       }
       await loadRoomPuzzles(chosen);
       const solved=document.createElement("p");solved.className="puzzle-success";solved.textContent="Puzzle completed. Your reward has been added.";
