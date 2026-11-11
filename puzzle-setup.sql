@@ -91,8 +91,8 @@ begin
     return jsonb_build_object('correct', true, 'already_solved', true, 'message', 'You have already solved this puzzle.');
   end if;
 
-  if lower(regexp_replace(trim(coalesce(p_answer, '')), '\\s+', ' ', 'g'))
-     <> lower(regexp_replace(trim(v_puzzle.answer), '\\s+', ' ', 'g')) then
+  if lower(regexp_replace(trim(coalesce(p_answer, '')), '[[:space:]]+', ' ', 'g'))
+     <> lower(regexp_replace(trim(v_puzzle.answer), '[[:space:]]+', ' ', 'g')) then
     return jsonb_build_object('correct', false, 'message', 'Not quite. Try again.');
   end if;
 
