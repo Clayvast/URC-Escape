@@ -27,7 +27,8 @@ create index if not exists pager_codes_lookup_idx on public.pager_codes(puzzle_i
 alter table public.pager_codes enable row level security;
 revoke all on public.pager_codes from anon, authenticated;
 
-create or replace function public.admin_list_puzzles()
+drop function if exists public.admin_list_puzzles();
+create function public.admin_list_puzzles()
 returns table(
   id uuid, room_name text, title text, prompt text, answer_type text,
   options jsonb, answer text, numeric_tolerance numeric,
@@ -108,7 +109,8 @@ begin
 end;
 $$;
 
-create or replace function public.get_room_puzzles(p_room_name text)
+drop function if exists public.get_room_puzzles(text);
+create function public.get_room_puzzles(p_room_name text)
 returns table (
   id uuid,title text,prompt text,hint text,reward_xp integer,reward_shards integer,
   solved boolean,answer_type text,options jsonb,hint_1 text,hint_2 text,hint_3 text,
@@ -121,7 +123,13 @@ as $$
     p.answer_type,p.options,coalesce(nullif(p.hint_1,''),p.hint),p.hint_2,p.hint_3,
     p.numeric_tolerance,
     -- The solution is never returned. Only presentation/configuration fields are public.
-    p.puzzle_config - 'solution' - 'correct' - 'answer' - 'sequence' - 'code'
+    case
+      when p.answer_type='hidden_message' and not exists(
+        select 1 from public.player_inventory i
+        where i.player_id=auth.uid() and i.item_id=coalesce(p.puzzle_config->>'requiredItemId','uv_torch') and i.quantity>0
+      ) then p.puzzle_config - 'hiddenMessage'
+      else p.puzzle_config - 'solution' - 'correct' - 'answer' - 'sequence' - 'code'
+    end
   from public.puzzles p
   where auth.uid() is not null and p.active=true and p.room_name=p_room_name
     and exists(select 1 from public.player_rooms r where r.player_id=auth.uid() and r.room_name=p_room_name)
