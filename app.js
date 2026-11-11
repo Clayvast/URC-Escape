@@ -105,65 +105,100 @@ async function loadRoomPuzzles(roomName){
   }
 }
 function showPuzzle(puzzle){
-  const play=$("#puzzle-play");
-  play.replaceChildren();
+  const play=$("#puzzle-play");play.replaceChildren();
   const title=document.createElement("h3");title.textContent=puzzle.title;
-  const prompt=document.createElement("p");prompt.className="puzzle-prompt";prompt.textContent=puzzle.prompt;
-  play.append(title,prompt);
-  const reward=document.createElement("p");reward.className="puzzle-reward";
-  reward.textContent="Reward: "+puzzle.reward_xp+" XP"+(puzzle.reward_shards?" · "+puzzle.reward_shards+" key shards":"");
-  play.append(reward);
-  if(puzzle.solved){
-    const done=document.createElement("p");done.className="puzzle-success";done.textContent="You have already solved this puzzle.";
-    play.append(done);return;
-  }
-  const hints=[puzzle.hint_1||puzzle.hint||"",puzzle.hint_2||"",puzzle.hint_3||""].filter(Boolean);
-  let hintIndex=0;
+  const prompt=document.createElement("p");prompt.className="puzzle-prompt";prompt.textContent=puzzle.prompt;play.append(title,prompt);
+  const reward=document.createElement("p");reward.className="puzzle-reward";reward.textContent="Reward: "+puzzle.reward_xp+" XP"+(puzzle.reward_shards?" · "+puzzle.reward_shards+" key shards":"");play.append(reward);
+  if(puzzle.solved){const done=document.createElement("p");done.className="puzzle-success";done.textContent="You have already solved this puzzle.";play.append(done);return}
+  const hints=[puzzle.hint_1||puzzle.hint||"",puzzle.hint_2||"",puzzle.hint_3||""].filter(Boolean);let hi=0;
   const hint=document.createElement("button");hint.type="button";hint.className="puzzle-hint";hint.textContent=hints.length?"Show hint 1":"No hints available";
   const hintText=document.createElement("p");hintText.className="puzzle-hint-text hidden";
-  hint.onclick=()=>{if(hintIndex<hints.length){hintText.textContent=hints[hintIndex++];hintText.classList.remove("hidden");hint.textContent=hintIndex<hints.length?"Show hint "+(hintIndex+1):"All hints revealed"}};
+  hint.onclick=()=>{if(hi<hints.length){hintText.textContent=hints[hi++];hintText.classList.remove("hidden");hint.textContent=hi<hints.length?"Show hint "+(hi+1):"All hints revealed"}};
   play.append(hint,hintText);
   const form=document.createElement("form");form.className="puzzle-answer-form";
-  let input;
-  if(puzzle.answer_type==="multiple_choice"){
-    input=document.createElement("select");input.required=true;
-    const placeholder=document.createElement("option");placeholder.value="";placeholder.textContent="Choose an answer";placeholder.disabled=true;placeholder.selected=true;input.append(placeholder);
-    (puzzle.options||[]).forEach(option=>{const o=document.createElement("option");o.value=option;o.textContent=option;input.append(o)});
-  }else{
-    input=document.createElement("input");input.type=puzzle.answer_type==="numerical"?"number":"text";
-    if(puzzle.answer_type==="numerical")input.step="any";
-    input.placeholder=puzzle.answer_type==="cipher"?"Enter the decoded message":"Enter your answer";
-    input.autocomplete="off";input.required=true;
-  }
-  const submit=document.createElement("button");submit.type="submit";submit.className="primary";submit.textContent="Submit answer";
   const feedback=document.createElement("p");feedback.className="puzzle-feedback";
-  form.append(input,submit,feedback);
-  form.onsubmit=async event=>{
-    event.preventDefault();submit.disabled=true;submit.textContent="Checking…";feedback.textContent="";
+  const cfg=puzzle.puzzle_config||{};
+  const finish=async(value)=>{
+    feedback.textContent="";
     try{
-      const {data,error}=await sb.rpc("submit_puzzle_answer",{p_puzzle_id:puzzle.id,p_answer:input.value});
+      const answer=typeof value==="string"?value:JSON.stringify(value);
+      const {data,error}=await sb.rpc("submit_puzzle_answer",{p_puzzle_id:puzzle.id,p_answer:answer});
       if(error)throw error;
-      if(!data?.correct){feedback.textContent=data?.message||"That answer was not correct. Try again.";return}
-      feedback.textContent=data.message||"Puzzle solved!";
-      feedback.className="puzzle-feedback puzzle-success";
+      if(!data?.correct){feedback.textContent=data?.message||"Not quite. Try again.";return}
       if(!data.already_solved){
-        const xp=data.xp_awarded||0,shards=data.shards_awarded||0;
-        toast("Puzzle solved! +"+xp+" XP"+(shards?" · +"+shards+" shards":""));
+        toast("Puzzle solved! +"+(data.xp_awarded||0)+" XP");
         const {data:progress}=await sb.from("player_progress").select("*").eq("player_id",user.id).maybeSingle();
         const total=progress?.xp||0;currentShards=progress?.key_shards||0;
         $("#player-level").textContent="Level "+(Math.floor(total/100)+1)+" · "+total+" XP";
-        $("#xp-label").textContent=total+" XP";$("#xp-bar").style.width=(total%100)+"%";
-        $("#shards").textContent=currentShards;await loadRoomUnlocks();
+        $("#xp-label").textContent=total+" XP";$("#xp-bar").style.width=(total%100)+"%";$("#shards").textContent=currentShards;
+        await loadRoomUnlocks();
       }
       await loadRoomPuzzles(chosen);
-      const solved=document.createElement("p");solved.className="puzzle-success";solved.textContent="Puzzle completed. Your reward has been added.";
-      play.replaceChildren(title,prompt,solved);
+      const done=document.createElement("p");done.className="puzzle-success";done.textContent="Puzzle completed. Your reward has been added.";play.replaceChildren(title,prompt,done);
     }catch(err){feedback.textContent=err.message||"Could not submit your answer."}
-    finally{submit.disabled=false;submit.textContent="Submit answer"}
   };
-  play.append(form);
+  const button=(label,fn)=>{const b=document.createElement("button");b.type="button";b.className="secondary";b.textContent=label;b.onclick=fn;form.append(b);return b};
+  const input=(placeholder,type="text")=>{const i=document.createElement("input");i.type=type;i.placeholder=placeholder;i.autocomplete="off";form.append(i);return i};
+  const check=(value,label)=>{const b=document.createElement("button");b.type="button";b.className="primary";b.textContent=label;b.onclick=()=>finish(value());form.append(b)};
+  const type=puzzle.answer_type;
+  if(type==="pager"){
+    const p=document.createElement("p");p.className="muted";p.textContent="A player holding the Pager generates a code. A different player must enter it here.";form.append(p);
+    if(playerInventory.has("pager"))button("Generate pager code",async()=>{
+      const {data,error}=await sb.rpc("create_pager_code",{p_puzzle_id:puzzle.id});
+      if(error){feedback.textContent=error.message;return}
+      const code=document.createElement("strong");code.className="pager-code";code.textContent=data.code;
+      const msg=document.createElement("p");msg.className="puzzle-success";msg.textContent="Give this code to another player. It expires in 2 minutes.";
+      form.insertBefore(msg,form.firstChild);form.insertBefore(code,msg);
+    });
+    else{const msg=document.createElement("p");msg.textContent="You need the Pager item to generate a code. Ask a teammate who has one.";msg.className="muted";form.append(msg)}
+    const code=input("Enter the 6-digit code");code.inputMode="numeric";code.maxLength=6;check(()=>code.value,"Unlock with code");
+  }else if(type==="grid_sequence"){
+    const seq=[];const grid=document.createElement("div");grid.className="button-grid-3";
+    for(let n=0;n<9;n++){const b=document.createElement("button");b.type="button";b.textContent=String(n+1);b.onclick=()=>{seq.push(n+1);b.classList.add("pressed");status.textContent="Entered: "+seq.join(" → ")};grid.append(b)}
+    const status=document.createElement("p");status.className="muted";status.textContent="Press the buttons in the correct order.";form.append(grid,status);
+    button("Clear sequence",()=>{seq.length=0;grid.querySelectorAll("button").forEach(b=>b.classList.remove("pressed"));status.textContent="Sequence cleared."});
+    check(()=>seq,"Check sequence");
+  }else if(type==="memory_sequence"){
+    const seq=(cfg.displaySequence||[]).map(String);const display=document.createElement("p");display.className="memory-sequence";display.textContent=seq.join(" · ")||"Sequence not configured";form.append(display);
+    const answer=input("Repeat sequence, separated by commas");check(()=>answer.value.split(/[ ,]+/).filter(Boolean),"Check sequence");
+  }else if(type==="combination_dials"){
+    const dials=cfg.dials||[{label:"Dial 1",min:0,max:9},{label:"Dial 2",min:0,max:9},{label:"Dial 3",min:0,max:9}];const values=[];
+    dials.forEach((d,i)=>{const l=document.createElement("label");l.textContent=d.label||("Dial "+(i+1));const sel=document.createElement("select");for(let n=Number(d.min??0);n<=Number(d.max??9);n++){const o=document.createElement("option");o.value=n;o.textContent=n;sel.append(o)}values[i]=Number(sel.value);sel.onchange=()=>values[i]=Number(sel.value);l.append(sel);form.append(l)});
+    check(()=>values,"Try combination");
+  }else if(type==="hidden_message"){
+    const item=cfg.requiredItemId||"uv_torch";const msg=document.createElement("p");msg.className="muted";
+    if(playerInventory.has(item)){msg.textContent=cfg.hiddenMessage||"The hidden message is ready to read.";form.append(msg);const a=input("Enter the revealed message");check(()=>a.value,"Submit message")}
+    else{msg.textContent="This message requires the inventory item: "+item;form.append(msg)}
+  }else if(type==="picture_reconstruction"){
+    if(cfg.imageUrl){const img=document.createElement("img");img.src=cfg.imageUrl;img.alt="Puzzle reference";img.className="puzzle-reference-image";form.append(img)}
+    const count=Math.max(4,Math.min(16,Number(cfg.pieces||9)));const tiles=Array.from({length:count},(_,i)=>i+1);
+    for(let i=count-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[tiles[i],tiles[j]]=[tiles[j],tiles[i]]}
+    const board=document.createElement("div");board.className="jigsaw-grid";let selected=-1;
+    const draw=()=>{board.replaceChildren();tiles.forEach((v,i)=>{const b=document.createElement("button");b.type="button";b.textContent=v;b.className=selected===i?"selected":"";b.onclick=()=>{if(selected<0){selected=i;draw()}else{[tiles[selected],tiles[i]]=[tiles[i],tiles[selected]];selected=-1;draw()}};board.append(b)})};draw();form.append(board);
+    check(()=>tiles,"Check arrangement");
+  }else if(type==="circuit_connection"){
+    const choices=cfg.connections||["A-B","A-C","B-C","B-D","C-D"];const chosenWires=new Set();const list=document.createElement("div");list.className="wire-list";
+    choices.forEach(w=>{const b=document.createElement("button");b.type="button";b.className="wire-choice";b.textContent=w;b.onclick=()=>{if(chosenWires.has(w)){chosenWires.delete(w);b.classList.remove("selected")}else{chosenWires.add(w);b.classList.add("selected")}};list.append(b)});form.append(list);
+    check(()=>[...chosenWires].sort(),"Test circuit");
+  }else if(type==="maze"){
+    const w=Math.max(3,Math.min(8,Number(cfg.width||5))),h=Math.max(3,Math.min(8,Number(cfg.height||5)));
+    const start=cfg.start||[0,0],end=cfg.finish||[w-1,h-1];let pos=[...start];const walls=new Set((cfg.walls||[]).map(p=>p.join(",")));
+    const board=document.createElement("div");board.className="maze-board";board.style.setProperty("--maze-cols",w);const status=document.createElement("p");status.className="muted";
+    const draw=()=>{board.replaceChildren();for(let y=0;y<h;y++)for(let x=0;x<w;x++){const cell=document.createElement("span");cell.className="maze-cell"+(walls.has(x+","+y)?" wall":"")+(pos[0]===x&&pos[1]===y?" player":"")+(end[0]===x&&end[1]===y?" finish":"");cell.textContent=pos[0]===x&&pos[1]===y?"●":end[0]===x&&end[1]===y?"★":"";board.append(cell)}status.textContent="Position: "+(pos[0]+1)+", "+(pos[1]+1)};
+    const move=(dx,dy)=>{const n=[pos[0]+dx,pos[1]+dy];if(n[0]<0||n[1]<0||n[0]>=w||n[1]>=h||walls.has(n.join(",")))return;pos=n;draw()};draw();form.append(board,status);
+    const controls=document.createElement("div");controls.className="maze-controls";[["↑",0,-1],["←",-1,0],["↓",0,1],["→",1,0]].forEach(v=>{const b=document.createElement("button");b.type="button";b.textContent=v[0];b.onclick=()=>move(v[1],v[2]);controls.append(b)});form.append(controls);
+    check(()=>pos,"Submit position");
+  }else if(type==="symbol_alignment"){
+    const rings=cfg.rings||[["☀","☾","★"],["▲","■","●"],["♜","♞","♝"]];const values=[];
+    rings.forEach((symbols,i)=>{const l=document.createElement("label");l.textContent="Ring "+(i+1);const sel=document.createElement("select");symbols.forEach(v=>{const o=document.createElement("option");o.value=v;o.textContent=v;sel.append(o)});values[i]=sel.value;sel.onchange=()=>values[i]=sel.value;l.append(sel);form.append(l)});
+    check(()=>values,"Align symbols");
+  }else{
+    let field;if(type==="multiple_choice"){field=document.createElement("select");const p=document.createElement("option");p.value="";p.textContent="Choose an answer";p.disabled=true;p.selected=true;field.append(p);(puzzle.options||[]).forEach(v=>{const o=document.createElement("option");o.value=v;o.textContent=v;field.append(o)});form.append(field)}
+    else{field=input(type==="cipher"?"Enter decoded message":"Enter your answer",type==="numerical"?"number":"text");if(type==="numerical")field.step="any"}
+    const b=document.createElement("button");b.type="submit";b.className="primary";b.textContent="Submit answer";form.append(b);form.onsubmit=e=>{e.preventDefault();finish(field.value)};
+  }
+  form.append(feedback);play.append(form);
 }
-
 let editingPuzzleId=null,adminPuzzleCache=[];
 async function loadAdminPuzzles(){
   const list=$("#admin-puzzle-list");if(!list)return;
