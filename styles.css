@@ -25,6 +25,7 @@
 .room.unlocked:hover,.room.unlocked.selected{fill-opacity:.25;stroke:var(--accent)}
 
 textarea{display:block;width:100%;padding:11px;margin-top:6px;border:1px solid #34465a;border-radius:8px;background:#0d151f;color:white;font:12px 'DM Sans';resize:vertical}
+.admin-reset-panel{border:1px solid #6d3b3b;background:#211719;border-radius:9px;padding:13px;margin-top:16px}.admin-reset-panel p{margin:5px 0 10px}.admin-reset-panel button{width:100%}
 .admin-puzzle-manager{border-top:1px solid var(--line);margin-top:20px;padding-top:18px}
 .admin-puzzle-manager h2{margin-top:7px}
 .admin-puzzle-manager label{font-size:11px}
