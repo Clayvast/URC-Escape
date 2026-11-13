@@ -62,7 +62,7 @@ function openPagerTools(row){
  redeem.onclick=async()=>{
   const value=code.value.trim(),puzzleId=challenge.value;
   if(!puzzleId){feedback.textContent="Choose the Pager challenge this code belongs to.";return}
-  if(!/^\\d{6}$/.test(value)){feedback.textContent="Enter the full 6-digit code.";feedback.classList.remove("success");return}
+  if(!/^\d{6}$/.test(value)){feedback.textContent="Enter the full 6-digit code.";feedback.classList.remove("success");return}
   redeem.disabled=true;redeem.textContent="Checking…";feedback.textContent="";
   try{const {data,error}=await sb.rpc("submit_puzzle_answer",{p_puzzle_id:puzzleId,p_answer:value});if(error)throw error;if(!data?.correct)throw Error(data?.message||"That code could not be used.");
    feedback.textContent=data.already_solved?"This Pager challenge has already been completed.":"Code accepted! "+(data.xp_awarded||0)+" XP"+(data.shards_awarded?" and "+data.shards_awarded+" key shards":"")+" awarded.";feedback.classList.add("success");code.value="";
@@ -136,6 +136,17 @@ $("#inspect").onclick=()=>toast(chosen+" is ready to explore.");
 $("#login-form").onsubmit=async e=>{e.preventDefault();$("#auth-error").textContent="";if(!sb){$("#auth-error").textContent="Add your Supabase project URL and anon key in supabase-config.js first.";return}let b=$("#login-button");b.disabled=true;b.textContent="Signing in…";try{let {data,error}=await sb.auth.signInWithPassword({email:toEmail($("#username").value),password:$("#password").value});if(error)throw error;await enter(data.user)}catch(err){$("#auth-error").textContent=err.message==="Invalid login credentials"?"Incorrect username or password.":err.message}finally{b.disabled=false;b.textContent="Sign in"}};
 $("#signout").onclick=async()=>{await sb?.auth.signOut();location.reload()};
 $("#create-player").onsubmit=async e=>{e.preventDefault();$("#create-error").textContent="";let b=e.submitter;b.disabled=true;try{let {data,error}=await sb.functions.invoke("admin-create-player",{body:{username:$("#new-username").value,password:$("#new-password").value,starting_room:$("#starting-room").value,ability:$("#ability").value}});if(error)throw error;if(data.error)throw Error(data.error);toast("Created "+data.username);e.target.reset()}catch(err){$("#create-error").textContent=err.message+" (check that the Edge Function is deployed)"}finally{b.disabled=false}};
+$("#reset-all-progress").onclick=async()=>{
+  const confirmed=confirm("RESET ALL PLAYER PROGRESS?\\n\\nThis will reset every player account to its starting room and remove all XP, key shards, solved-puzzle records and inventory items. Player accounts, usernames, passwords, starting rooms and puzzles will be kept.\\n\\nThis cannot be undone.");
+  if(!confirmed)return;
+  const button=$("#reset-all-progress");button.disabled=true;button.textContent="Resetting…";
+  try{
+    const {data,error}=await sb.rpc("admin_reset_all_player_progress");
+    if(error)throw error;
+    toast("Reset complete for "+(data?.players_reset??"all")+" players.");
+  }catch(err){toast(err.message||"Could not reset player progress.");}
+  finally{button.disabled=false;button.textContent="Reset all player progress";}
+};
 if(!ready)$("#auth-error").textContent="Setup required: add Supabase URL and anon key to supabase-config.js.";
 
 
