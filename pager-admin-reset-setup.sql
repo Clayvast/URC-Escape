@@ -117,3 +117,7 @@ $$;
 
 revoke all on function public.admin_reset_all_player_progress() from public, anon;
 grant execute on function public.admin_reset_all_player_progress() to authenticated;
+
+
+-- Ask PostgREST to refresh its function schema cache.
+notify pgrst, 'reload schema';
