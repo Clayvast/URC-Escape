@@ -207,7 +207,7 @@ function showPuzzle(puzzle){
     const msg=document.createElement("p");msg.className="muted";msg.textContent="Ask another player who owns a Pager to generate a code for this challenge. Enter their six-digit code below.";form.append(msg);
     const field=input("Enter 6-digit Pager code");field.inputMode="numeric";field.maxLength=6;field.autocomplete="one-time-code";
     const submit=document.createElement("button");submit.type="submit";submit.className="primary";submit.textContent="Submit Pager code";form.append(submit);
-    form.onsubmit=e=>{e.preventDefault();if(!/^\\d{6}$/.test(field.value.trim())){feedback.textContent="Enter the full 6-digit code.";return}finish(field.value.trim())};
+    form.onsubmit=e=>{e.preventDefault();if(!/^\d{6}$/.test(field.value.trim())){feedback.textContent="Enter the full 6-digit code.";return}finish(field.value.trim())};
   }else if(type==="grid_sequence"){
     const seq=[];const grid=document.createElement("div");grid.className="button-grid-3";
     for(let n=0;n<9;n++){const b=document.createElement("button");b.type="button";b.textContent=String(n+1);b.onclick=()=>{seq.push(n+1);b.classList.add("pressed");status.textContent="Entered: "+seq.join(" → ")};grid.append(b)}
