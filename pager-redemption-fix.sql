@@ -16,7 +16,7 @@ begin
     raise exception 'You must be signed in to redeem a Pager code.';
   end if;
 
-  if v_entered_code !~ '^\\d{6}$' then
+  if v_entered_code !~ '^[0-9]{6}$' then
     return jsonb_build_object('correct', false, 'message', 'Enter a valid six-digit Pager code.');
   end if;
 
