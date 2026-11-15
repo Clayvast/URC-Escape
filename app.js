@@ -34,44 +34,32 @@ function openPagerTools(row){
  document.querySelectorAll(".pager-tools").forEach(x=>{if(x._pagerRefresh)clearInterval(x._pagerRefresh);x.remove()});
  const panel=document.createElement("div");panel.className="pager-tools";
  const heading=document.createElement("b");heading.textContent="📟 Pager";
- const info=document.createElement("p");info.className="muted";info.textContent="Choose a Pager challenge to generate a code for another player, or enter a code they have given you. The challenge list refreshes automatically.";
+ const info=document.createElement("p");info.className="muted";info.textContent="Generate a code for any active Pager challenge. You can do this at any time, without opening the puzzle. Give the code to another player.";
  const challenge=document.createElement("select");challenge.setAttribute("aria-label","Pager challenge");
  const generate=document.createElement("button");generate.type="button";generate.className="secondary";generate.textContent="Generate code";
- const code=document.createElement("input");code.type="text";code.inputMode="numeric";code.autocomplete="one-time-code";code.maxLength=6;code.placeholder="Enter 6-digit code";
- const redeem=document.createElement("button");redeem.type="button";redeem.className="primary";redeem.textContent="Use code";
+ const code=document.createElement("input");code.type="text";code.readOnly=true;code.inputMode="numeric";code.maxLength=6;code.placeholder="Your generated code";
  const feedback=document.createElement("p");feedback.className="pager-feedback";
  const loadOptions=async()=>{
   const previous=challenge.value;
   const {data,error}=await sb.rpc("get_player_pager_puzzles");
   if(!panel.isConnected)return;
   challenge.replaceChildren();
-  if(error){const o=document.createElement("option");o.value="";o.textContent="Pager setup required";challenge.append(o);feedback.textContent=error.message;generate.disabled=true;redeem.disabled=true;return}
-  const options=(data||[]).filter(p=>!p.solved);
-  if(!options.length){const o=document.createElement("option");o.value="";o.textContent="No available Pager challenges in your discovered rooms";challenge.append(o);generate.disabled=true;redeem.disabled=true;return}
+  if(error){const o=document.createElement("option");o.value="";o.textContent="Pager setup required";challenge.append(o);feedback.textContent=error.message;generate.disabled=true;return}
+  const options=data||[];
+  if(!options.length){const o=document.createElement("option");o.value="";o.textContent="No active Pager challenges";challenge.append(o);generate.disabled=true;return}
   options.forEach(p=>{const o=document.createElement("option");o.value=p.id;o.textContent=p.title+" · "+p.room_name;challenge.append(o)});
   if(options.some(p=>p.id===previous))challenge.value=previous;
-  generate.disabled=false;redeem.disabled=false;
+  generate.disabled=false;
  };
  generate.onclick=async()=>{
   const puzzleId=challenge.value;if(!puzzleId){feedback.textContent="Choose a Pager challenge first.";return}
-  generate.disabled=true;generate.textContent="Generating…";feedback.textContent="";
-  try{const {data,error}=await sb.rpc("create_pager_code",{p_puzzle_id:puzzleId});if(error)throw error;code.value=data.code;feedback.textContent="Your code is "+data.code+". Give it to another player — it expires in 2 minutes.";feedback.classList.add("success")}
-  catch(err){feedback.textContent=err.message||"Could not generate a code.";feedback.classList.remove("success")}
+  generate.disabled=true;generate.textContent="Generating…";feedback.textContent="";feedback.classList.remove("success");code.value="";
+  try{const {data,error}=await sb.rpc("create_pager_code",{p_puzzle_id:puzzleId});if(error)throw error;code.value=data.code;feedback.textContent="Give this code to another player. It expires in 2 minutes.";feedback.classList.add("success")}
+  catch(err){feedback.textContent=err.message||"Could not generate a code."}
   finally{generate.disabled=false;generate.textContent="Generate code"}
  };
- redeem.onclick=async()=>{
-  const value=code.value.trim(),puzzleId=challenge.value;
-  if(!puzzleId){feedback.textContent="Choose the Pager challenge this code belongs to.";return}
-  if(!/^\d{6}$/.test(value)){feedback.textContent="Enter the full 6-digit code.";feedback.classList.remove("success");return}
-  redeem.disabled=true;redeem.textContent="Checking…";feedback.textContent="";
-  try{const {data,error}=await sb.rpc("submit_puzzle_answer",{p_puzzle_id:puzzleId,p_answer:value});if(error)throw error;if(!data?.correct)throw Error(data?.message||"That code could not be used.");
-   feedback.textContent=data.already_solved?"This Pager challenge has already been completed.":"Code accepted! "+(data.xp_awarded||0)+" XP"+(data.shards_awarded?" and "+data.shards_awarded+" key shards":"")+" awarded.";feedback.classList.add("success");code.value="";
-   await refreshPlayerProgress();if(chosen&&known.has(chosen))await loadRoomPuzzles(chosen);await loadOptions();toast(data.already_solved?"Challenge already completed":"Pager code accepted!");
-  }catch(err){feedback.textContent=err.message||"Could not use that code.";feedback.classList.remove("success")}
-  finally{redeem.disabled=false;redeem.textContent="Use code"}
- };
- panel.append(heading,info,challenge,generate,code,redeem,feedback);row.after(panel);
- loadOptions();panel._pagerRefresh=setInterval(loadOptions,5000);
+ panel.append(heading,info,challenge,generate,code,feedback);row.after(panel);
+ loadOptions();panel._pagerRefresh=setInterval(loadOptions,10000);
 }
 async function loadRoomUnlocks(){
   const {data,error}=await sb.rpc("get_room_unlock_options");
@@ -216,9 +204,10 @@ function showPuzzle(puzzle){
   const check=(value,label)=>{const b=document.createElement("button");b.type="button";b.className="primary";b.textContent=label;b.onclick=()=>finish(value());form.append(b);return b};
   const type=puzzle.answer_type;
   if(type==="pager"){
-    const msg=document.createElement("p");msg.className="muted";msg.textContent="Use the Pager item in your inventory to generate a code or enter a code from another player. You do not need to keep this puzzle open.";form.append(msg);
-    const open=button("Open Pager in inventory",()=>{const pager=[...document.querySelectorAll("#inventory-list .inventory-item")].find(x=>x.getAttribute("aria-label")==="Open Pager");if(pager){pager.scrollIntoView({behavior:"smooth",block:"center"});openPagerTools(pager)}else feedback.textContent="You need the Pager item in your inventory."});
-    if(!playerInventory.has("pager")){open.disabled=true;const missing=document.createElement("p");missing.className="muted";missing.textContent="You need the Pager inventory item.";form.append(missing)}
+    const msg=document.createElement("p");msg.className="muted";msg.textContent="Ask another player who owns a Pager to generate a code for this challenge. Enter their six-digit code below.";form.append(msg);
+    const field=input("Enter 6-digit Pager code");field.inputMode="numeric";field.maxLength=6;field.autocomplete="one-time-code";
+    const submit=document.createElement("button");submit.type="submit";submit.className="primary";submit.textContent="Submit Pager code";form.append(submit);
+    form.onsubmit=e=>{e.preventDefault();if(!/^\\d{6}$/.test(field.value.trim())){feedback.textContent="Enter the full 6-digit code.";return}finish(field.value.trim())};
   }else if(type==="grid_sequence"){
     const seq=[];const grid=document.createElement("div");grid.className="button-grid-3";
     for(let n=0;n<9;n++){const b=document.createElement("button");b.type="button";b.textContent=String(n+1);b.onclick=()=>{seq.push(n+1);b.classList.add("pressed");status.textContent="Entered: "+seq.join(" → ")};grid.append(b)}
