@@ -184,7 +184,7 @@ function showPuzzle(puzzle){
     feedback.textContent="";
     try{
       const answer=typeof value==="string"?value:JSON.stringify(value);
-      const {data,error}=await sb.rpc("submit_puzzle_answer",{p_puzzle_id:puzzle.id,p_answer:answer});
+      const {data,error}=await sb.rpc(puzzle.answer_type==="pager"?"redeem_pager_code_for_puzzle":"submit_puzzle_answer",puzzle.answer_type==="pager"?{p_puzzle_id:puzzle.id,p_code:answer}:{p_puzzle_id:puzzle.id,p_answer:answer});
       if(error)throw error;
       if(!data?.correct){feedback.textContent=data?.message||"Not quite. Try again.";return}
       if(!data.already_solved){
