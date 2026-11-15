@@ -67,7 +67,7 @@ begin
   where role = 'player';
 
   -- Invalidate every outstanding Pager code.
-  delete from public.pager_codes;
+  delete from public.pager_codes where true;
 
   delete from public.puzzle_solves
   where player_id in (
