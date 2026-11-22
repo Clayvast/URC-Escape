@@ -301,7 +301,7 @@ function showPuzzle(puzzle){
     vectors.forEach(v=>{const b=document.createElement("button");b.type="button";b.textContent=v[0];b.setAttribute("aria-label",v[0]);b.onclick=()=>move(v[1],v[2]);controls.append(b)});
     const reset=document.createElement("button");reset.type="button";reset.className="maze-reset";reset.textContent="Restart maze";reset.onclick=()=>{pos=[...start];moves=0;lives=Math.max(1,Number(cfg.lives||3));finished=false;collected.clear();activated.clear();seen.clear();message.textContent="Maze restarted.";controls.querySelectorAll("button").forEach(b=>b.disabled=false);draw()};controls.append(reset);
     form.append(objectives,stats,board,status,controls,message);
-    const handleKey=e=>{if(!play.isConnected||finished)return;const map={ArrowUp:[0,-1],w:[0,-1],W:[0,-1],ArrowDown:[0,1],s:[0,1],S:[0,1],ArrowLeft:[-1,0],a:[-1,0],A:[-1,0],ArrowRight:[1,0],d:[1,0],D:[1,0]};const v=map[e.key];if(v){e.preventDefault();move(v[0],v[1])}};
+    const handleKey=e=>{if(!play.isConnected||finished||/^(INPUT|TEXTAREA|SELECT)$/.test(e.target?.tagName||""))return;const map={ArrowUp:[0,-1],w:[0,-1],W:[0,-1],ArrowDown:[0,1],s:[0,1],S:[0,1],ArrowLeft:[-1,0],a:[-1,0],A:[-1,0],ArrowRight:[1,0],d:[1,0],D:[1,0]};const v=map[e.key];if(v){e.preventDefault();move(v[0],v[1])}};
     document.addEventListener("keydown",handleKey);
     play._mazeCleanup=()=>document.removeEventListener("keydown",handleKey);
     draw();
