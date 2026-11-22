@@ -178,7 +178,7 @@ async function loadRoomPuzzles(roomName){
   }
 }
 function showPuzzle(puzzle){
-  const play=$("#puzzle-play");play.replaceChildren();
+  const play=$("#puzzle-play");if(play._mazeCleanup)play._mazeCleanup();play._mazeCleanup=null;play.replaceChildren();
   const title=document.createElement("h3");title.textContent=puzzle.title;
   const prompt=document.createElement("p");prompt.className="puzzle-prompt";prompt.textContent=puzzle.prompt;play.append(title,prompt);
   const reward=document.createElement("p");reward.className="puzzle-reward";reward.textContent="Reward: "+puzzle.reward_xp+" XP"+(puzzle.reward_shards?" · "+puzzle.reward_shards+" key shards":"");play.append(reward);
@@ -286,9 +286,9 @@ function showPuzzle(puzzle){
       stats.textContent="Moves: "+moves+(cfg.maxMoves>0?" / "+Number(cfg.maxMoves):"")+" · Lives: "+lives;
       status.textContent="Position: "+(pos[0]+1)+", "+(pos[1]+1);
     };
-    const finishMaze=()=>{if(pos[0]!==end[0]||pos[1]!==end[1]){message.textContent="You must reach the exit.";return}if(!objectivesDone()){message.textContent="The exit is sealed. Collect every key and activate every switch first.";return}finished=true;message.textContent="All objectives complete! Exit unlocked.";controls.querySelectorAll("button").forEach(b=>b.disabled=true);check(()=>pos,"Escape the maze")};
+    const finishMaze=()=>{if(pos[0]!==end[0]||pos[1]!==end[1]){message.textContent="You must reach the exit.";return}if(!objectivesDone()){message.textContent="The exit is sealed. Collect every key and activate every switch first.";return}finished=true;message.textContent="All objectives complete! Exit unlocked.";controls.querySelectorAll("button:not(.maze-reset)").forEach(b=>b.disabled=true);check(()=>pos,"Escape the maze")};
     const move=(dx,dy)=>{
-      if(finished||lives<=0)return;
+      if(finished||lives<=0||(Number(cfg.maxMoves)>0&&moves>=Number(cfg.maxMoves)))return;
       const n=[pos[0]+dx,pos[1]+dy];if(blocked(n[0],n[1])){message.textContent="That route is blocked.";return}
       pos=n;moves++;message.textContent="";
       const k=keyDefs.find(v=>v.x===pos[0]&&v.y===pos[1]&&!collected.has(v.id));if(k){collected.add(k.id);message.textContent="Collected "+k.label+"!"}
