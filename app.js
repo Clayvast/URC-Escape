@@ -248,13 +248,64 @@ function showPuzzle(puzzle){
     choices.forEach(w=>{const b=document.createElement("button");b.type="button";b.className="wire-choice";b.textContent=w;b.onclick=()=>{if(chosenWires.has(w)){chosenWires.delete(w);b.classList.remove("selected")}else{chosenWires.add(w);b.classList.add("selected")}};list.append(b)});form.append(list);
     check(()=>[...chosenWires].sort(),"Test circuit");
   }else if(type==="maze"){
-    const w=Math.max(3,Math.min(8,Number(cfg.width||5))),h=Math.max(3,Math.min(8,Number(cfg.height||5)));
-    const start=cfg.start||[0,0],end=cfg.finish||[w-1,h-1];let pos=[...start];const walls=new Set((cfg.walls||[]).map(p=>p.join(",")));
-    const board=document.createElement("div");board.className="maze-board";board.style.setProperty("--maze-cols",w);const status=document.createElement("p");status.className="muted";
-    const draw=()=>{board.replaceChildren();for(let y=0;y<h;y++)for(let x=0;x<w;x++){const cell=document.createElement("span");cell.className="maze-cell"+(walls.has(x+","+y)?" wall":"")+(pos[0]===x&&pos[1]===y?" player":"")+(end[0]===x&&end[1]===y?" finish":"");cell.textContent=pos[0]===x&&pos[1]===y?"●":end[0]===x&&end[1]===y?"★":"";board.append(cell)}status.textContent="Position: "+(pos[0]+1)+", "+(pos[1]+1)};
-    const move=(dx,dy)=>{const n=[pos[0]+dx,pos[1]+dy];if(n[0]<0||n[1]<0||n[0]>=w||n[1]>=h||walls.has(n.join(",")))return;pos=n;draw()};draw();form.append(board,status);
-    const controls=document.createElement("div");controls.className="maze-controls";[["↑",0,-1],["←",-1,0],["↓",0,1],["→",1,0]].forEach(v=>{const b=document.createElement("button");b.type="button";b.textContent=v[0];b.onclick=()=>move(v[1],v[2]);controls.append(b)});form.append(controls);
-    check(()=>pos,"Submit position");
+    // Maze v2: keys, pressure switches, locked doors, hazards, fog of war and
+    // optional move limits. The server still checks the configured finish
+    // coordinate, while this interface requires every configured objective.
+    const w=Math.max(4,Math.min(15,Number(cfg.width||12))),h=Math.max(4,Math.min(15,Number(cfg.height||12)));
+    const point=(p,fallback)=>Array.isArray(p)&&p.length>=2?[Number(p[0]),Number(p[1])]:fallback;
+    const start=point(cfg.start,[0,0]),end=point(cfg.finish,[w-1,h-1]);let pos=[...start],moves=0,lives=Math.max(1,Number(cfg.lives||3)),finished=false;
+    const keyDefs=(cfg.keys||[]).map((k,i)=>({id:String(k.id||("key"+(i+1))),x:Number(k.x),y:Number(k.y),label:String(k.label||("Key "+(i+1)))}));
+    const switchDefs=(cfg.switches||[]).map((s,i)=>({id:String(s.id||("switch"+(i+1))),x:Number(s.x),y:Number(s.y),label:String(s.label||("Switch "+(i+1)))}));
+    const doorDefs=(cfg.doors||[]).map((d,i)=>({id:String(d.id||("door"+(i+1))),x:Number(d.x),y:Number(d.y),keyId:d.keyId?String(d.keyId):null,switchId:d.switchId?String(d.switchId):null}));
+    const hazards=(cfg.hazards||[]).map(p=>Array.isArray(p)?{x:Number(p[0]),y:Number(p[1])}:{x:Number(p.x),y:Number(p.y),type:p.type||"reset"});
+    const walls=new Set((cfg.walls||[]).map(p=>p.join(","))),collected=new Set(),activated=new Set(),seen=new Set();
+    const id=(x,y)=>x+","+y,inside=(x,y)=>x>=0&&y>=0&&x<w&&y<h;
+    const requiredKeys=keyDefs.map(k=>k.id),requiredSwitches=switchDefs.map(s=>s.id);
+    const board=document.createElement("div");board.className="maze-board maze-board-v2";board.style.setProperty("--maze-cols",w);
+    const status=document.createElement("p");status.className="maze-status";
+    const objectives=document.createElement("div");objectives.className="maze-objectives";
+    const stats=document.createElement("div");stats.className="maze-stats";
+    const message=document.createElement("p");message.className="maze-message";
+    const controls=document.createElement("div");controls.className="maze-controls";
+    const keyForDoor=d=>!d.keyId||collected.has(d.keyId);
+    const switchForDoor=d=>!d.switchId||activated.has(d.switchId);
+    const doorAt=(x,y)=>doorDefs.find(d=>d.x===x&&d.y===y);
+    const blocked=(x,y)=>!inside(x,y)||walls.has(id(x,y))||(doorAt(x,y)&&!(keyForDoor(doorAt(x,y))&&switchForDoor(doorAt(x,y))));
+    const objectivesDone=()=>requiredKeys.every(k=>collected.has(k))&&requiredSwitches.every(s=>activated.has(s));
+    const reveal=()=>{const radius=Math.max(0,Math.min(8,Number(cfg.visibilityRadius??2)));if(cfg.fogOfWar===false||cfg.visibilityRadius===0){for(let y=0;y<h;y++)for(let x=0;x<w;x++)seen.add(id(x,y));return}for(let y=Math.max(0,pos[1]-radius);y<=Math.min(h-1,pos[1]+radius);y++)for(let x=Math.max(0,pos[0]-radius);x<=Math.min(w-1,pos[0]+radius);x++)if(Math.abs(x-pos[0])+Math.abs(y-pos[1])<=radius+1)seen.add(id(x,y))};
+    const draw=()=>{
+      reveal();board.replaceChildren();
+      for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+        const cell=document.createElement("span"),k=keyDefs.find(v=>v.x===x&&v.y===y),s=switchDefs.find(v=>v.x===x&&v.y===y),d=doorAt(x,y),haz=hazards.find(v=>v.x===x&&v.y===y);
+        const visible=seen.has(id(x,y));cell.className="maze-cell"+(!visible?" unexplored":walls.has(id(x,y))?" wall":"")+(pos[0]===x&&pos[1]===y?" player":"")+(end[0]===x&&end[1]===y?" finish":"")+(d?" door":"")+(haz&&visible?" hazard":"")+(s&&activated.has(s.id)?" switch-active":"");
+        if(visible){cell.textContent=pos[0]===x&&pos[1]===y?"●":k&&!collected.has(k.id)?"🔑":s?(activated.has(s.id)?"✓":"⚙"):d?(keyForDoor(d)&&switchForDoor(d)?"·":"🔒"):haz?"⚠":end[0]===x&&end[1]===y?"★":"";cell.title=k?k.label:s?s.label:d?"Locked door":haz?"Hazard":""}
+        board.append(cell);
+      }
+      const keyCount=collected.size+"/"+requiredKeys.length,switchCount=activated.size+"/"+requiredSwitches.length;
+      objectives.textContent="Keys "+keyCount+" · Switches "+switchCount+" · Exit "+(objectivesDone()?"unlocked":"locked");
+      stats.textContent="Moves: "+moves+(cfg.maxMoves>0?" / "+Number(cfg.maxMoves):"")+" · Lives: "+lives;
+      status.textContent="Position: "+(pos[0]+1)+", "+(pos[1]+1);
+    };
+    const finishMaze=()=>{if(pos[0]!==end[0]||pos[1]!==end[1]){message.textContent="You must reach the exit.";return}if(!objectivesDone()){message.textContent="The exit is sealed. Collect every key and activate every switch first.";return}finished=true;message.textContent="All objectives complete! Exit unlocked.";controls.querySelectorAll("button").forEach(b=>b.disabled=true);check(()=>pos,"Escape the maze")};
+    const move=(dx,dy)=>{
+      if(finished||lives<=0)return;
+      const n=[pos[0]+dx,pos[1]+dy];if(blocked(n[0],n[1])){message.textContent="That route is blocked.";return}
+      pos=n;moves++;message.textContent="";
+      const k=keyDefs.find(v=>v.x===pos[0]&&v.y===pos[1]&&!collected.has(v.id));if(k){collected.add(k.id);message.textContent="Collected "+k.label+"!"}
+      const s=switchDefs.find(v=>v.x===pos[0]&&v.y===pos[1]&&!activated.has(v.id));if(s){activated.add(s.id);message.textContent="Activated "+s.label+"!"}
+      const hazard=hazards.find(v=>v.x===pos[0]&&v.y===pos[1]);if(hazard){lives--;message.textContent=hazard.type==="life"?"A trap cost you a life!":"A trap sent you back to the start!";if(hazard.type!=="life")pos=[...start];if(lives<=0){message.textContent="No lives remaining. Reset the maze to try again.";controls.querySelectorAll("button").forEach(b=>b.disabled=true)}}
+      if(Number(cfg.maxMoves)>0&&moves>=Number(cfg.maxMoves)&&!objectivesDone()){message.textContent="Move limit reached. Reset the maze to try again.";controls.querySelectorAll("button").forEach(b=>b.disabled=true)}
+      draw();if(pos[0]===end[0]&&pos[1]===end[1])finishMaze();
+    };
+    const vectors=[["↑",0,-1],["←",-1,0],["↓",0,1],["→",1,0]];
+    vectors.forEach(v=>{const b=document.createElement("button");b.type="button";b.textContent=v[0];b.setAttribute("aria-label",v[0]);b.onclick=()=>move(v[1],v[2]);controls.append(b)});
+    const reset=document.createElement("button");reset.type="button";reset.className="maze-reset";reset.textContent="Restart maze";reset.onclick=()=>{pos=[...start];moves=0;lives=Math.max(1,Number(cfg.lives||3));finished=false;collected.clear();activated.clear();seen.clear();message.textContent="Maze restarted.";controls.querySelectorAll("button").forEach(b=>b.disabled=false);draw()};controls.append(reset);
+    form.append(objectives,stats,board,status,controls,message);
+    const handleKey=e=>{if(!play.isConnected||finished)return;const map={ArrowUp:[0,-1],w:[0,-1],W:[0,-1],ArrowDown:[0,1],s:[0,1],S:[0,1],ArrowLeft:[-1,0],a:[-1,0],A:[-1,0],ArrowRight:[1,0],d:[1,0],D:[1,0]};const v=map[e.key];if(v){e.preventDefault();move(v[0],v[1])}};
+    document.addEventListener("keydown",handleKey);
+    play._mazeCleanup=()=>document.removeEventListener("keydown",handleKey);
+    draw();
+    if(!inside(start[0],start[1])||!inside(end[0],end[1]))message.textContent="Maze setup error: start and finish must be inside the grid.";
   }else if(type==="symbol_alignment"){
     const rings=cfg.rings||[["☀","☾","★"],["▲","■","●"],["♜","♞","♝"]];const values=[];
     rings.forEach((symbols,i)=>{const l=document.createElement("label");l.textContent="Ring "+(i+1);const sel=document.createElement("select");symbols.forEach(v=>{const o=document.createElement("option");o.value=v;o.textContent=v;sel.append(o)});values[i]=sel.value;sel.onchange=()=>values[i]=sel.value;l.append(sel);form.append(l)});
