@@ -293,8 +293,8 @@ function showPuzzle(puzzle){
       pos=n;moves++;message.textContent="";
       const k=keyDefs.find(v=>v.x===pos[0]&&v.y===pos[1]&&!collected.has(v.id));if(k){collected.add(k.id);message.textContent="Collected "+k.label+"!"}
       const s=switchDefs.find(v=>v.x===pos[0]&&v.y===pos[1]&&!activated.has(v.id));if(s){activated.add(s.id);message.textContent="Activated "+s.label+"!"}
-      const hazard=hazards.find(v=>v.x===pos[0]&&v.y===pos[1]);if(hazard){lives--;message.textContent=hazard.type==="life"?"A trap cost you a life!":"A trap sent you back to the start!";if(hazard.type!=="life")pos=[...start];if(lives<=0){message.textContent="No lives remaining. Reset the maze to try again.";controls.querySelectorAll("button").forEach(b=>b.disabled=true)}}
-      if(Number(cfg.maxMoves)>0&&moves>=Number(cfg.maxMoves)&&!objectivesDone()){message.textContent="Move limit reached. Reset the maze to try again.";controls.querySelectorAll("button").forEach(b=>b.disabled=true)}
+      const hazard=hazards.find(v=>v.x===pos[0]&&v.y===pos[1]);if(hazard){lives--;message.textContent=hazard.type==="life"?"A trap cost you a life!":"A trap sent you back to the start!";if(hazard.type!=="life")pos=[...start];if(lives<=0){message.textContent="No lives remaining. Reset the maze to try again.";controls.querySelectorAll("button:not(.maze-reset)").forEach(b=>b.disabled=true)}}
+      if(Number(cfg.maxMoves)>0&&moves>=Number(cfg.maxMoves)&&!(pos[0]===end[0]&&pos[1]===end[1]&&objectivesDone())){message.textContent="Move limit reached. Reset the maze to try again.";controls.querySelectorAll("button:not(.maze-reset)").forEach(b=>b.disabled=true)}
       draw();if(pos[0]===end[0]&&pos[1]===end[1])finishMaze();
     };
     const vectors=[["↑",0,-1],["←",-1,0],["↓",0,1],["→",1,0]];
