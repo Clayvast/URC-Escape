@@ -10,7 +10,7 @@ as $$
 declare
   v_puzzle public.puzzles%rowtype;
   v_code public.pager_codes%rowtype;
-  v_entered_code text := trim(coalesce(p_code, ''));
+  v_entered_code text := left(regexp_replace(coalesce(p_code, ''), '[^0-9]', '', 'g'), 6);
 begin
   if auth.uid() is null then
     raise exception 'You must be signed in to redeem a Pager code.';
