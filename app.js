@@ -1,6 +1,17 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const ready=window.URC_SUPABASE_URL&&!window.URC_SUPABASE_URL.startsWith("YOUR_")&&window.URC_SUPABASE_ANON_KEY&&!window.URC_SUPABASE_ANON_KEY.startsWith("YOUR_");
-const sb=ready?createClient(window.URC_SUPABASE_URL,window.URC_SUPABASE_ANON_KEY):null;
+// Keep Supabase authentication isolated to this browser tab. localStorage is shared
+// by every tab on the same origin, which causes one player's login to replace
+// another player's session. sessionStorage is tab-scoped, while still allowing
+// the session to persist across page refreshes in that tab.
+const sb=ready?createClient(window.URC_SUPABASE_URL,window.URC_SUPABASE_ANON_KEY,{
+  auth:{
+    storage:window.sessionStorage,
+    persistSession:true,
+    autoRefreshToken:true,
+    detectSessionInUrl:true
+  }
+}):null;
 const rooms=["Garden","Kitchen","Hall","Backstage","Band Stand","Stage","Sanctuary","Forum","Hallway","WC","Office (west)","Vestry","Lounge","Storage","Youth Room","Office (east)","Side room"];
 const desc={"Garden":"An outdoor garden. Search for hidden clues.","Kitchen":"A kitchen with possible ingredients and clues.","Hall":"A large hall connecting several parts of the building.","Backstage":"A restricted backstage area.","Band Stand":"A small band stand beside the stage.","Stage":"A performance space.","Sanctuary":"A spacious sanctuary.","Forum":"A long room connecting the sanctuary to the hallway.","Hallway":"A central corridor with several doorways.","WC":"A small room off the hallway.","Office (west)":"An office beside the WC.","Vestry":"A room connected to the central hallway.","Lounge":"A lounge and potential meeting point.","Storage":"A small storage room.","Youth Room":"A separate room on the east side.","Office (east)":"A small office beside the Youth Room.","Side room":"A small unlabelled room."};
 const $=s=>document.querySelector(s);let playerInventory=new Set();let portal="player",user=null,profile=null,known=new Set(),chosen=null,roomRules=new Map(),currentShards=0;
